@@ -3,16 +3,16 @@
  * Injected into web pages to perform scraping
  */
 
-import { MessageType, type Message } from '../types/messages';
-import { safeQuerySelector, safeQuerySelectorAll } from '../utils/dom';
-import { extractText } from '../utils/scraper';
+import { MessageType, type Message } from '@/types/messages';
+import { safeQuerySelectorAll } from '@utils/dom';
+import { extractText } from '@utils/scraper';
 
 console.log('🌐 WebHand Content Script loaded on:', window.location.href);
 
 // Message listener
 chrome.runtime.onMessage.addListener((
     message: Message,
-    sender,
+    _sender,
     sendResponse
 ) => {
     console.log('📨 Message received in content script:', message.type);
@@ -21,13 +21,13 @@ chrome.runtime.onMessage.addListener((
         case MessageType.START_SCRAPE:
             handleStartScrape(message.payload)
                 .then(sendResponse)
-                .catch(error => sendResponse({ error: error.message }));
+                .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
             return true; // Async response
 
         case MessageType.READ_PAGE:
             handleReadPage()
                 .then(sendResponse)
-                .catch(error => sendResponse({ error: error.message }));
+                .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
             return true;
 
         default:
@@ -73,7 +73,7 @@ async function handleStartScrape(config: any) {
 
         chrome.runtime.sendMessage({
             type: MessageType.SCRAPE_ERROR,
-            payload: { error: error.message }
+            payload: { error: error instanceof Error ? error.message : String(error) }
         });
 
         throw error;

@@ -43,7 +43,7 @@ export function detectListPattern(container: Element) {
     const MIN_ITEMS = 3;
 
     if (children.length < MIN_ITEMS) {
-        return { isPattern Detected: false, pattern: null };
+        return { isPatternDetected: false, pattern: null };
     }
 
     // Create signature for each child

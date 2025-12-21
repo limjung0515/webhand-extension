@@ -25,8 +25,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 // Message handler
 chrome.runtime.onMessage.addListener((
     message: Message,
-    sender,
-    sendResponse
+    sender
 ) => {
     console.log('📨 Message received in background:', message.type, sender.tab?.id);
 
