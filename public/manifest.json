@@ -34,7 +34,7 @@
         }
     ],
     "side_panel": {
-        "default_path": "sidepanel.html"
+        "default_path": "src/sidepanel/index.html"
     },
     "permissions": [
         "activeTab",
@@ -49,7 +49,7 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "sidepanel.html"
+                "src/sidepanel/index.html"
             ],
             "matches": [
                 "<all_urls>"
