@@ -3,15 +3,73 @@
  * Injected into web pages to perform scraping
  */
 
-import { MessageType, type Message } from '@/types/messages';
-import { safeQuerySelectorAll } from '@utils/dom';
-import { extractText } from '@utils/scraper';
+// Inline message types to avoid imports
+const MessageType = {
+    START_SCRAPE: 'START_SCRAPE',
+    STOP_SCRAPE: 'STOP_SCRAPE',
+    SCRAPE_PROGRESS: 'SCRAPE_PROGRESS',
+    SCRAPE_COMPLETE: 'SCRAPE_COMPLETE',
+    SCRAPE_ERROR: 'SCRAPE_ERROR',
+    READ_PAGE: 'READ_PAGE',
+    READ_PAGE_RESPONSE: 'READ_PAGE_RESPONSE',
+    OPEN_SIDE_PANEL: 'OPEN_SIDE_PANEL',
+    CLOSE_SIDE_PANEL: 'CLOSE_SIDE_PANEL',
+    SAVE_DATA: 'SAVE_DATA',
+    LOAD_DATA: 'LOAD_DATA',
+    UPDATE_SETTINGS: 'UPDATE_SETTINGS',
+} as const;
+
+// Inline utility functions
+function safeQuerySelectorAll<T extends Element = Element>(
+    selector: string,
+    parent: Document | Element = document
+): T[] {
+    try {
+        return Array.from(parent.querySelectorAll<T>(selector));
+    } catch (error) {
+        console.error('querySelectorAll failed:', error);
+        return [];
+    }
+}
+
+function extractText(element: Element): string {
+    if (!element) return '';
+
+    let text = '';
+
+    for (const node of element.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const content = node.textContent
+                ?.replace(/\s\s+/g, ' ')
+                .replace(/\n/g, ' ')
+                .trim();
+
+            if (content && content.length > 0) {
+                text += content + ' ';
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as Element;
+
+            // Skip hidden or script elements
+            if (
+                el.classList?.contains('visually-hidden') ||
+                /^(script|style|noscript)$/i.test(el.tagName)
+            ) {
+                continue;
+            }
+
+            text += extractText(el);
+        }
+    }
+
+    return text.replace(/\s\s+/g, ' ').trim();
+}
 
 console.log('🌐 WebHand Content Script loaded on:', window.location.href);
 
 // Message listener
 chrome.runtime.onMessage.addListener((
-    message: Message,
+    message: any,
     _sender,
     sendResponse
 ) => {

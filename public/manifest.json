@@ -30,8 +30,7 @@
                 "<all_urls>"
             ],
             "run_at": "document_idle",
-            "all_frames": false,
-            "type": "module"
+            "all_frames": false
         }
     ],
     "side_panel": {
@@ -50,7 +49,8 @@
     "web_accessible_resources": [
         {
             "resources": [
-                "src/sidepanel/index.html"
+                "src/sidepanel/index.html",
+                "assets/*.js"
             ],
             "matches": [
                 "<all_urls>"
