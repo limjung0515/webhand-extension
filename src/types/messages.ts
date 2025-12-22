@@ -21,6 +21,9 @@ export enum MessageType {
 
     // Settings
     UPDATE_SETTINGS = 'UPDATE_SETTINGS',
+
+    // Results
+    OPEN_RESULT_PAGE = 'OPEN_RESULT_PAGE',
 }
 
 export interface Message<T = any> {

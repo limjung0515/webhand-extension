@@ -3,6 +3,9 @@
  * Injected into web pages to perform scraping
  */
 
+import { DomemeScraper } from '@/scrapers/domeme';
+import { ScrapeModal } from './scrape-modal';
+
 // Inline message types to avoid imports
 const MessageType = {
     START_SCRAPE: 'START_SCRAPE',
@@ -17,6 +20,7 @@ const MessageType = {
     SAVE_DATA: 'SAVE_DATA',
     LOAD_DATA: 'LOAD_DATA',
     UPDATE_SETTINGS: 'UPDATE_SETTINGS',
+    START_SITE_SCRAPE: 'START_SITE_SCRAPE',
 } as const;
 
 // Inline utility functions
@@ -84,6 +88,12 @@ chrome.runtime.onMessage.addListener((
 
         case MessageType.READ_PAGE:
             handleReadPage()
+                .then(sendResponse)
+                .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
+            return true;
+
+        case MessageType.START_SITE_SCRAPE:
+            handleSiteScrape(message.payload)
                 .then(sendResponse)
                 .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
             return true;
@@ -156,6 +166,92 @@ async function handleReadPage() {
     };
 
     return { success: true, content };
+}
+
+// Site-specific scraping
+async function handleSiteScrape(payload: any) {
+    console.log('🎯 Starting site scrape:', payload);
+
+    const { scraperId, options } = payload;
+
+    // 도매매 스크래퍼
+    if (scraperId === 'domeme') {
+        const scraper = new DomemeScraper();
+        const modal = new ScrapeModal();
+
+        try {
+            modal.show();
+
+            let results;
+
+            if (options.mode === 'current') {
+                // 현재 페이지만
+                results = scraper.scrapeCurrentPage();
+
+                modal.updateProgress({
+                    current: 1,
+                    total: 1,
+                    status: 'complete',
+                    message: '스크래핑 완료!'
+                });
+            } else {
+                // 전체 페이지
+                results = await scraper.scrapeAllPages((progress) => {
+                    modal.updateProgress(progress);
+
+                    // Background에도 전송
+                    chrome.runtime.sendMessage({
+                        type: MessageType.SCRAPE_PROGRESS,
+                        payload: progress
+                    });
+                });
+            }
+
+            // 결과 저장
+            const scrapeResult = {
+                id: Date.now().toString(),
+                scraperId: 'domeme',
+                scraperName: '도매매',
+                url: window.location.href,
+                timestamp: Date.now(),
+                totalItems: results.length,
+                items: results
+            };
+
+            // Chrome Storage에 저장
+            await chrome.storage.local.set({
+                [`scrape_result_${scrapeResult.id}`]: scrapeResult
+            });
+
+            // 완료 대기 (사용자가 확인할 시간)
+            await new Promise(r => setTimeout(r, 1000));
+
+            modal.hide();
+
+            // 결과 페이지 열기
+            chrome.runtime.sendMessage({
+                type: 'OPEN_RESULT_PAGE',
+                payload: { resultId: scrapeResult.id }
+            });
+
+            return { success: true, resultId: scrapeResult.id };
+
+        } catch (error) {
+            modal.updateProgress({
+                current: 0,
+                total: 0,
+                status: 'error',
+                message: error instanceof Error ? error.message : '알 수 없는 오류'
+            });
+
+            await new Promise(r => setTimeout(r, 2000));
+            modal.hide();
+
+            throw error;
+        }
+    }
+
+    throw new Error('Unsupported scraper: ' + scraperId);
 }
 
 // Add button to open side panel

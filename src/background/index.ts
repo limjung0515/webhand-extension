@@ -42,6 +42,10 @@ chrome.runtime.onMessage.addListener((
             handleReadPage(sender.tab?.id);
             break;
 
+        case MessageType.OPEN_RESULT_PAGE:
+            handleOpenResultPage(message.payload);
+            break;
+
         default:
             console.warn('⚠️ Unknown message type:', message.type);
     }
@@ -94,6 +98,19 @@ async function handleReadPage(tabId?: number) {
         console.error('❌ Failed to read page:', error);
     }
 }
+
+// Open result page
+async function handleOpenResultPage(payload: { resultId: string }) {
+    const resultUrl = chrome.runtime.getURL(`src/pages/results.html?id=${payload.resultId}`);
+
+    try {
+        await chrome.tabs.create({ url: resultUrl });
+        console.log('✅ Result page opened:', payload.resultId);
+    } catch (error) {
+        console.error('❌ Failed to open result page:', error);
+    }
+}
+
 
 // Handle extension icon click
 chrome.action.onClicked.addListener((tab) => {

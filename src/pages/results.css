@@ -1,0 +1,223 @@
+/* Results Page Styles */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    background: #f5f5f5;
+}
+
+.loading-container,
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.results-container {
+    min-height: 100vh;
+    padding-bottom: 60px;
+}
+
+/* Header */
+.results-header {
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-content h1 {
+    margin: 0 0 12px 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+
+.header-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 14px;
+    color: #666;
+}
+
+.site-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-download {
+    padding: 10px 20px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-download:hover {
+    background: #218838;
+}
+
+/* Table */
+.table-container {
+    padding: 24px;
+    overflow-x: auto;
+}
+
+.results-table {
+    width: 100%;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-collapse: collapse;
+}
+
+.results-table thead {
+    background: #f8f9fa;
+}
+
+.results-table th {
+    padding: 16px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #e0e0e0;
+    white-space: nowrap;
+}
+
+.results-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.results-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.td-number {
+    text-align: center;
+    color: #999;
+    font-weight: 600;
+}
+
+.td-image {
+    width: 80px;
+}
+
+.td-image img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.no-image {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0f0f0;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #999;
+}
+
+.td-name {
+    max-width: 300px;
+    font-weight: 500;
+    color: #333;
+}
+
+.td-price {
+    font-weight: 600;
+    color: #e74c3c;
+    white-space: nowrap;
+}
+
+.td-shipping {
+    font-size: 13px;
+    color: #666;
+    white-space: nowrap;
+}
+
+.td-seller {
+    font-size: 13px;
+    color: #666;
+}
+
+.td-id {
+    font-family: monospace;
+    font-size: 12px;
+    color: #999;
+}
+
+.td-link a {
+    color: #667eea;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.td-link a:hover {
+    text-decoration: underline;
+}
+
+/* Footer */
+.results-footer {
+    background: white;
+    border-top: 1px solid #e0e0e0;
+    padding: 16px 24px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+}

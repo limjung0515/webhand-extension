@@ -37,6 +37,7 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 sidepanel: path.resolve(__dirname, 'src/sidepanel/index.html'),
+                results: path.resolve(__dirname, 'src/pages/results.html'),
                 background: path.resolve(__dirname, 'src/background/index.ts'),
                 content: path.resolve(__dirname, 'src/content/index.ts')
             },
