@@ -53,7 +53,8 @@ h2 {
 }
 
 .info-card,
-.result-card {
+.result-card,
+.error-card {
     background: white;
     border-radius: 8px;
     padding: 16px;
@@ -122,6 +123,179 @@ h2 {
     color: white;
 }
 
+.btn-copy {
+    padding: 8px 16px;
+    font-size: 12px;
+    background: #48bb78;
+    color: white;
+}
+
+/* Error Styling */
+.error {
+    animation: slideIn 0.3s ease-out;
+}
+
+.error-card {
+    background: #fff5f5;
+    border-left: 4px solid #fc8181;
+}
+
+.error-card h3 {
+    color: #c53030;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.error-card p {
+    color: #742a2a;
+    margin-bottom: 12px;
+}
+
+.error-hint {
+    background: white;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.error-hint strong {
+    color: #2d3748;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.error-hint ul {
+    margin-left: 20px;
+    color: #4a5568;
+}
+
+.error-hint li {
+    margin-bottom: 4px;
+}
+
+/* Results Styling */
+.results {
+    animation: slideIn 0.3s ease-out;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.result-table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+}
+
+.result-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.result-table th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.result-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 13px;
+}
+
+.result-table tr:last-child td {
+    border-bottom: none;
+}
+
+.result-table tr:hover {
+    background: #f7fafc;
+}
+
+.result-table td.key {
+    font-weight: 600;
+    color: #4a5568;
+    min-width: 120px;
+    max-width: 150px;
+}
+
+.result-table td.value {
+    color: #2d3748;
+    word-break: break-word;
+}
+
+/* Details/Summary Styling */
+details {
+    cursor: pointer;
+}
+
+summary {
+    user-select: none;
+    color: #667eea;
+    font-weight: 500;
+}
+
+summary:hover {
+    text-decoration: underline;
+}
+
+.array-list {
+    margin-top: 8px;
+    margin-left: 20px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.array-list li {
+    padding: 4px 0;
+    font-size: 12px;
+    color: #4a5568;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.array-list li:last-child {
+    border-bottom: none;
+}
+
+.array-list li.more {
+    color: #667eea;
+    font-style: italic;
+}
+
+.full-text {
+    margin-top: 8px;
+    padding: 12px;
+    background: #f7fafc;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #2d3748;
+}
+
+/* JSON View */
+.json-view {
+    margin-top: 16px;
+}
+
+.json-view summary {
+    padding: 12px;
+    background: #edf2f7;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
 .result-card pre {
     font-size: 12px;
     line-height: 1.6;
@@ -138,4 +312,36 @@ h2 {
     border-top: 1px solid #e2e8f0;
     font-size: 12px;
     color: #718096;
+}
+
+/* Animations */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
 }

@@ -6,6 +6,7 @@ function App() {
     const [pageTitle, setPageTitle] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [scrapedData, setScrapedData] = useState<any>(null);
+    const [error, setError] = useState<string>('');
 
     useEffect(() => {
         // Get current tab info
@@ -28,10 +29,12 @@ function App() {
                 case MessageType.SCRAPE_COMPLETE:
                     setScrapedData(message.payload.data);
                     setIsLoading(false);
+                    setError('');
                     break;
 
                 case MessageType.SCRAPE_ERROR:
                     console.error('❌ Error:', message.payload);
+                    setError(message.payload.error || '알 수 없는 오류');
                     setIsLoading(false);
                     break;
             }
@@ -47,13 +50,15 @@ function App() {
     const handleReadPage = async () => {
         console.log('🔵 handleReadPage called');
         setIsLoading(true);
+        setError('');
+        setScrapedData(null);
 
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             console.log('🔵 Current tab:', tab);
 
             if (!tab.id) {
-                throw new Error('No active tab');
+                throw new Error('활성 탭을 찾을 수 없습니다');
             }
 
             console.log('🔵 Sending READ_PAGE message to tab:', tab.id);
@@ -62,10 +67,16 @@ function App() {
             });
 
             console.log('✅ Page content received:', response);
-            setScrapedData(response.content);
-        } catch (error) {
-            console.error('❌ Failed to read page:', error);
-            alert(`오류: ${error instanceof Error ? error.message : String(error)}`);
+
+            if (response && response.success) {
+                setScrapedData(response.content);
+            } else {
+                throw new Error('페이지 읽기 실패');
+            }
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            console.error('❌ Failed to read page:', errorMsg);
+            setError(errorMsg);
         } finally {
             setIsLoading(false);
         }
@@ -74,13 +85,15 @@ function App() {
     const handleStartScrape = async () => {
         console.log('🔵 handleStartScrape called');
         setIsLoading(true);
+        setError('');
+        setScrapedData(null);
 
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             console.log('🔵 Current tab for scrape:', tab);
 
             if (!tab.id) {
-                throw new Error('No active tab');
+                throw new Error('활성 탭을 찾을 수 없습니다');
             }
 
             console.log('🔵 Sending START_SCRAPE message to tab:', tab.id);
@@ -92,11 +105,30 @@ function App() {
                 }
             });
             console.log('✅ Scrape message sent successfully');
-        } catch (error) {
-            console.error('❌ Failed to start scrape:', error);
-            alert(`오류: ${error instanceof Error ? error.message : String(error)}`);
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            console.error('❌ Failed to start scrape:', errorMsg);
+            setError(errorMsg);
             setIsLoading(false);
         }
+    };
+
+    const handleCopyResult = () => {
+        if (scrapedData) {
+            const text = JSON.stringify(scrapedData, null, 2);
+            navigator.clipboard.writeText(text);
+            alert('📋 결과가 클립보드에 복사되었습니다!');
+        }
+    };
+
+    const renderValue = (value: any): string => {
+        if (Array.isArray(value)) {
+            return `${value.length}개 항목`;
+        }
+        if (typeof value === 'object' && value !== null) {
+            return JSON.stringify(value);
+        }
+        return String(value);
     };
 
     return (
@@ -142,12 +174,86 @@ function App() {
                     </div>
                 </section>
 
+                {error && (
+                    <section className="error">
+                        <div className="error-card">
+                            <h3>❌ 오류 발생</h3>
+                            <p>{error}</p>
+                            <div className="error-hint">
+                                <strong>해결 방법:</strong>
+                                <ul>
+                                    <li>페이지를 새로고침해보세요 (F5)</li>
+                                    <li>확장프로그램을 새로고침해보세요</li>
+                                    <li>콘솔(F12)에서 자세한 오류를 확인하세요</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
                 {scrapedData && (
                     <section className="results">
-                        <h2>결과</h2>
-                        <div className="result-card">
-                            <pre>{JSON.stringify(scrapedData, null, 2)}</pre>
+                        <div className="results-header">
+                            <h2>✅ 결과</h2>
+                            <button className="btn btn-copy" onClick={handleCopyResult}>
+                                📋 복사
+                            </button>
                         </div>
+
+                        {/* Table View */}
+                        <div className="result-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>항목</th>
+                                        <th>값</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Object.entries(scrapedData).map(([key, value]) => (
+                                        <tr key={key}>
+                                            <td className="key">{key}</td>
+                                            <td className="value">
+                                                {Array.isArray(value) ? (
+                                                    <details>
+                                                        <summary>{value.length}개 항목 (클릭하여 보기)</summary>
+                                                        <ul className="array-list">
+                                                            {value.slice(0, 10).map((item, idx) => (
+                                                                <li key={idx}>
+                                                                    {typeof item === 'object'
+                                                                        ? JSON.stringify(item)
+                                                                        : String(item)}
+                                                                </li>
+                                                            ))}
+                                                            {value.length > 10 && (
+                                                                <li className="more">
+                                                                    ... 외 {value.length - 10}개
+                                                                </li>
+                                                            )}
+                                                        </ul>
+                                                    </details>
+                                                ) : typeof value === 'string' && value.length > 100 ? (
+                                                    <details>
+                                                        <summary>{value.substring(0, 100)}...</summary>
+                                                        <p className="full-text">{value}</p>
+                                                    </details>
+                                                ) : (
+                                                    renderValue(value)
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* JSON View (collapsible) */}
+                        <details className="json-view">
+                            <summary>📄 JSON 형식으로 보기</summary>
+                            <div className="result-card">
+                                <pre>{JSON.stringify(scrapedData, null, 2)}</pre>
+                            </div>
+                        </details>
                     </section>
                 )}
             </div>
