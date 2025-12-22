@@ -45,38 +45,45 @@ function App() {
     }, []);
 
     const handleReadPage = async () => {
+        console.log('🔵 handleReadPage called');
         setIsLoading(true);
 
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            console.log('🔵 Current tab:', tab);
 
             if (!tab.id) {
                 throw new Error('No active tab');
             }
 
+            console.log('🔵 Sending READ_PAGE message to tab:', tab.id);
             const response = await chrome.tabs.sendMessage(tab.id, {
                 type: MessageType.READ_PAGE
             });
 
-            console.log('✅ Page content:', response);
+            console.log('✅ Page content received:', response);
             setScrapedData(response.content);
         } catch (error) {
             console.error('❌ Failed to read page:', error);
+            alert(`오류: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleStartScrape = async () => {
+        console.log('🔵 handleStartScrape called');
         setIsLoading(true);
 
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            console.log('🔵 Current tab for scrape:', tab);
 
             if (!tab.id) {
                 throw new Error('No active tab');
             }
 
+            console.log('🔵 Sending START_SCRAPE message to tab:', tab.id);
             await chrome.tabs.sendMessage(tab.id, {
                 type: MessageType.START_SCRAPE,
                 payload: {
@@ -84,8 +91,10 @@ function App() {
                     fields: ['title', 'content']
                 }
             });
+            console.log('✅ Scrape message sent successfully');
         } catch (error) {
             console.error('❌ Failed to start scrape:', error);
+            alert(`오류: ${error instanceof Error ? error.message : String(error)}`);
             setIsLoading(false);
         }
     };

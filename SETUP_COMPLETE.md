@@ -68,7 +68,7 @@ npm run build
 
 ## 🚀 구현된 기능
 
-### ✅ 메시징 시스템
+### ✅ 메시징 시스템₩₩
 - Background ↔ Content Script 통신
 - 실시간 메시지 전달
 - 타입 안전 메시지
