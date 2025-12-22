@@ -160,9 +160,23 @@ async function handleReadPage() {
 
 // Add button to open side panel
 function injectOpenButton() {
-    const button = document.createElement('button');
-    button.id = 'webhand-open-panel';
-    button.style.cssText = `
+    // Safety check: ensure document.body exists
+    if (!document.body) {
+        console.warn('⚠️ document.body not ready, retrying...');
+        setTimeout(injectOpenButton, 100);
+        return;
+    }
+
+    try {
+        // Check if button already exists
+        if (document.getElementById('webhand-open-panel')) {
+            console.log('✅ WebHand button already exists');
+            return;
+        }
+
+        const button = document.createElement('button');
+        button.id = 'webhand-open-panel';
+        button.style.cssText = `
     position: fixed;
     bottom: 20px;
     right: 20px;
@@ -178,26 +192,37 @@ function injectOpenButton() {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transition: transform 0.2s;
   `;
-    button.textContent = '📊 WebHand';
+        button.textContent = '📊 WebHand';
 
-    button.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: MessageType.OPEN_SIDE_PANEL });
-    });
+        button.addEventListener('click', () => {
+            chrome.runtime.sendMessage({ type: MessageType.OPEN_SIDE_PANEL });
+        });
 
-    button.addEventListener('mouseenter', () => {
-        button.style.transform = 'scale(1.05)';
-    });
+        button.addEventListener('mouseenter', () => {
+            button.style.transform = 'scale(1.05)';
+        });
 
-    button.addEventListener('mouseleave', () => {
-        button.style.transform = 'scale(1)';
-    });
+        button.addEventListener('mouseleave', () => {
+            button.style.transform = 'scale(1)';
+        });
 
-    document.body.appendChild(button);
+        document.body.appendChild(button);
+        console.log('✅ WebHand button injected successfully');
+    } catch (error) {
+        console.error('❌ Failed to inject button:', error);
+    }
 }
 
-// Initialize
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectOpenButton);
-} else {
-    injectOpenButton();
+// Initialize with multiple safety checks
+function initialize() {
+    if (document.readyState === 'loading') {
+        console.log('⏳ Document still loading, waiting for DOMContentLoaded...');
+        document.addEventListener('DOMContentLoaded', injectOpenButton);
+    } else {
+        console.log('✅ Document ready, injecting button...');
+        injectOpenButton();
+    }
 }
+
+// Start initialization
+initialize();
