@@ -1,27 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { crx } from '@crxjs/vite-plugin';
 import path from 'path';
+import manifest from './public/manifest.json';
 
 export default defineConfig({
     plugins: [
         react(),
-        viteStaticCopy({
-            targets: [
-                {
-                    src: 'public/manifest.json',
-                    dest: '.'
-                },
-                {
-                    src: 'public/icons/*',
-                    dest: 'icons'
-                },
-                {
-                    src: 'public/_locales/**/*',
-                    dest: '_locales'
-                }
-            ]
-        })
+        crx({ manifest })
     ],
     resolve: {
         alias: {
@@ -36,24 +22,8 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
             input: {
-                sidepanel: path.resolve(__dirname, 'src/sidepanel/index.html'),
-                results: path.resolve(__dirname, 'src/pages/results.html'),
-                background: path.resolve(__dirname, 'src/background/index.ts'),
-                content: path.resolve(__dirname, 'src/content/index.ts')
-            },
-            output: {
-                entryFileNames: (chunkInfo) => {
-                    if (chunkInfo.name === 'background') return 'background.js';
-                    if (chunkInfo.name === 'content') return 'content.js';
-                    return 'assets/[name]-[hash].js';
-                },
-                chunkFileNames: 'assets/[name]-[hash].js',
-                assetFileNames: (assetInfo) => {
-                    if (assetInfo.name?.endsWith('.css')) {
-                        return 'assets/[name]-[hash][extname]';
-                    }
-                    return 'assets/[name]-[hash][extname]';
-                }
+                // results 페이지를 명시적으로 추가
+                results: path.resolve(__dirname, 'src/pages/results.html')
             }
         }
     }

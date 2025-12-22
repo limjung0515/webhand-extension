@@ -21,7 +21,36 @@ function App() {
                 setFavicon(tabs[0].favIconUrl || '');
             }
         });
+
+        // Listen for scraping finished message
+        // Listen for scraping status messages
+        const messageListener = (message: any) => {
+            if (message.type === 'SCRAPE_FINISHED') {
+                console.log('📨 Scraping finished, restoring UI state');
+                setIsLoading(false);
+            } else if (message.type === 'SCRAPE_STARTED') {
+                console.log('📨 Scraping started');
+                setIsLoading(true);
+            }
+        };
+
+        chrome.runtime.onMessage.addListener(messageListener);
+
+        return () => {
+            chrome.runtime.onMessage.removeListener(messageListener);
+        };
     }, []);
+
+    const handleStopScrape = async () => {
+        try {
+            await chrome.runtime.sendMessage({
+                type: 'STOP_SCRAPE'
+            });
+            setIsLoading(false);
+        } catch (err) {
+            console.error('Failed to stop scrape:', err);
+        }
+    };
 
     const handleStartScrape = async () => {
         if (!isDomeme) {
@@ -32,23 +61,56 @@ function App() {
         setIsLoading(true);
 
         try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            // Get the current window first
+            const currentWindow = await chrome.windows.getCurrent();
 
-            if (!tab.id) {
-                throw new Error('활성 탭을 찾을 수 없습니다');
+            // Query for active tab in the current window
+            const tabs = await chrome.tabs.query({
+                active: true,
+                windowId: currentWindow.id
+            });
+
+            const tab = tabs.find(t => !t.url?.startsWith('chrome-extension://'));
+
+            if (!tab || !tab.id) {
+                throw new Error('도매매 탭을 찾을 수 없습니다. 도매매 페이지에서 다시 시도해주세요.');
             }
+
+            console.log('🎯 Sending scrape message to tab:', tab.id, tab.url);
 
             const options: ScrapeOptions = {
                 mode: scrapeMode
             };
 
-            await chrome.tabs.sendMessage(tab.id, {
-                type: 'START_SITE_SCRAPE',
-                payload: {
-                    scraperId: 'domeme',
-                    options
-                }
-            });
+            // 즉시 블러 UI 표시 (UX 최우선)
+            try {
+                await chrome.tabs.sendMessage(tab.id, {
+                    type: 'SHOW_SCRAPE_MODAL'
+                });
+            } catch (e) {
+                console.warn('Failed to show modal immediately:', e);
+            }
+
+            if (scrapeMode === 'all') {
+                // 전체 페이지 모드: Background에서 처리
+                await chrome.runtime.sendMessage({
+                    type: 'START_ALL_PAGE_SCRAPE',
+                    payload: {
+                        tabId: tab.id,
+                        scraperId: 'domeme',
+                        baseUrl: tab.url
+                    }
+                });
+            } else {
+                // 현재 페이지만: Content script에서 직접 처리
+                await chrome.tabs.sendMessage(tab.id, {
+                    type: 'START_SITE_SCRAPE',
+                    payload: {
+                        scraperId: 'domeme',
+                        options
+                    }
+                });
+            }
 
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : String(err);
@@ -128,13 +190,22 @@ function App() {
 
             {/* 스크래핑 버튼 */}
             <section className="actions">
-                <button
-                    className="btn-scrape"
-                    onClick={handleStartScrape}
-                    disabled={!isDomeme || isLoading}
-                >
-                    {isLoading ? '⏳ 스크래핑 중...' : '🔍 스크래핑 시작'}
-                </button>
+                {isLoading ? (
+                    <button
+                        className="btn-stop"
+                        onClick={handleStopScrape}
+                    >
+                        ⛔ 스크래핑 중단
+                    </button>
+                ) : (
+                    <button
+                        className="btn-scrape"
+                        onClick={handleStartScrape}
+                        disabled={!isDomeme}
+                    >
+                        🔍 스크래핑 시작
+                    </button>
+                )}
             </section>
         </div>
     );

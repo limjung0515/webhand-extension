@@ -18,13 +18,13 @@
         "128": "icons/icon-128.png"
     },
     "background": {
-        "service_worker": "background.js",
+        "service_worker": "src/background/index.ts",
         "type": "module"
     },
     "content_scripts": [
         {
             "js": [
-                "content.js"
+                "src/content/index.ts"
             ],
             "matches": [
                 "<all_urls>"
@@ -45,17 +45,6 @@
     ],
     "host_permissions": [
         "<all_urls>"
-    ],
-    "web_accessible_resources": [
-        {
-            "resources": [
-                "src/sidepanel/index.html",
-                "assets/*.js"
-            ],
-            "matches": [
-                "<all_urls>"
-            ]
-        }
     ],
     "minimum_chrome_version": "114"
 }

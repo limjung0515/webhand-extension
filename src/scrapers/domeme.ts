@@ -110,6 +110,18 @@ export class DomemeScraper {
                 break;
             }
 
+            // 진행 상황을 storage에 저장 (페이지 이동 대비)
+            try {
+                await chrome.storage.local.set({
+                    scrape_in_progress: {
+                        currentPage: this.currentPage,
+                        results: this.results
+                    }
+                });
+            } catch (e) {
+                console.warn('Failed to save progress:', e);
+            }
+
             // 다음 페이지로 이동
             nextButton.click();
             await this.waitForPageLoad();
@@ -128,13 +140,20 @@ export class DomemeScraper {
             });
         }
 
+        // 완료 후 진행 상황 삭제
+        try {
+            await chrome.storage.local.remove('scrape_in_progress');
+        } catch (e) {
+            console.warn('Failed to clear progress:', e);
+        }
+
         return this.results;
     }
 
     /**
      * 다음 버튼 찾기
      */
-    private findNextButton(): HTMLAnchorElement | null {
+    findNextButton(): HTMLAnchorElement | null {
         // img alt="다음페이지 바로가기"의 부모 a 태그
         const nextImg = Array.from(document.querySelectorAll('img')).find(
             img => img.alt === '다음페이지 바로가기'
@@ -154,7 +173,7 @@ export class DomemeScraper {
     /**
      * 페이지 로드 대기
      */
-    private waitForPageLoad(): Promise<void> {
+    waitForPageLoad(): Promise<void> {
         return new Promise((resolve) => {
             const checkInterval = setInterval(() => {
                 const hasProducts = document.querySelector('.sub_cont_bane1');

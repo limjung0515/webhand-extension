@@ -197,3 +197,19 @@ section h2 {
     opacity: 0.5;
     cursor: not-allowed;
 }
+.btn-stop {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    transition: transform 0.2s;
+}
+
+.btn-stop:hover {
+    transform: translateY(-2px);
+}
