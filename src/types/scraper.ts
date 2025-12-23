@@ -26,6 +26,8 @@ export interface ScrapeResult {
     scraperId: string;
     scraperName: string;
     url: string;
+    pageTitle?: string;
+    favicon?: string;
     timestamp: number;
     totalItems: number;
     items: ProductItem[];

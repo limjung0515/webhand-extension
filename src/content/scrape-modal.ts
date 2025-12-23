@@ -1,6 +1,6 @@
 /**
- * Scrape Progress Overlay
- * 스크래핑 진행 중 페이지 전체를 덮는 오버레이
+ * Scrape Progress Modal
+ * 스크래핑 진행 중 페이지에 표시되는 향상된 모달
  */
 
 import type { ScrapeProgress } from '@/types/scraper';
@@ -8,12 +8,14 @@ import type { ScrapeProgress } from '@/types/scraper';
 export class ScrapeModal {
     private overlay: HTMLDivElement | null = null;
     private modal: HTMLDivElement | null = null;
+    private progressBar: HTMLDivElement | null = null;
+    private scrollAnimationId: number | null = null;
 
     /**
      * 모달 표시
      */
     show() {
-        // 전체 화면 오버레이 생성
+        // 전체 화면 블러 오버레이
         this.overlay = document.createElement('div');
         this.overlay.id = 'webhand-scrape-overlay';
         this.overlay.style.cssText = `
@@ -22,8 +24,9 @@ export class ScrapeModal {
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             z-index: 999999;
             display: flex;
             align-items: center;
@@ -37,101 +40,100 @@ export class ScrapeModal {
             e.stopPropagation();
         }, true);
 
-        // 모달 컨텐츠
+        // 모달 생성
         this.modal = document.createElement('div');
         this.modal.id = 'webhand-scrape-modal';
         this.modal.style.cssText = `
+            position: relative;
             background: white;
             border-radius: 16px;
-            padding: 48px 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
             min-width: 450px;
             max-width: 500px;
-            text-align: center;
-            animation: webhand-fade-in 0.3s ease-out;
         `;
 
         this.modal.innerHTML = `
             <style>
-                @keyframes webhand-fade-in {
+                @keyframes webhand-modal-appear {
                     from {
                         opacity: 0;
-                        transform: scale(0.95);
+                        transform: scale(0.95) translateY(-10px);
                     }
                     to {
                         opacity: 1;
-                        transform: scale(1);
+                        transform: scale(1) translateY(0);
                     }
                 }
-                @keyframes webhand-spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
+                @keyframes webhand-progress-indeterminate {
+                    0% {
+                        left: -50%;
+                    }
+                    100% {
+                        left: 100%;
+                    }
                 }
             </style>
             
-            <div style="margin-bottom: 32px;">
-                <div style="
-                    width: 60px;
-                    height: 60px;
-                    margin: 0 auto 20px;
-                    border: 4px solid #f3f3f3;
-                    border-top: 4px solid #667eea;
-                    border-radius: 50%;
-                    animation: webhand-spin 1s linear infinite;
-                "></div>
-                <h2 id="webhand-title" style="
-                    margin: 0 0 12px 0;
-                    font-size: 24px;
-                    font-weight: 700;
-                    color: #333;
-                ">
-                    스크래핑 진행 중
-                </h2>
-                <p style="
-                    margin: 0;
-                    font-size: 14px;
-                    color: #666;
-                    line-height: 1.6;
-                ">
-                    잠시만 기다려주세요...<br>
-                    페이지를 클릭하거나 스크롤하지 마세요
-                </p>
-            </div>
-            
-            <div id="webhand-progress-container" style="margin-bottom: 24px;">
-                <div style="
-                    background: #f0f0f0;
-                    border-radius: 10px;
-                    height: 10px;
-                    overflow: hidden;
-                    margin-bottom: 12px;
-                ">
-                    <div id="webhand-progress-bar" style="
-                        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-                        height: 100%;
-                        width: 0%;
-                        transition: width 0.3s ease;
-                    "></div>
-                </div>
-                <div id="webhand-progress-text" style="
-                    font-size: 15px;
-                    color: #666;
-                    font-weight: 500;
-                ">
-                    페이지 1 스크래핑 중...
-                </div>
-            </div>
-            
+            <!-- 상단 프로그레스 바 -->
             <div style="
-                padding: 16px;
-                background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
-                border: 2px solid #ffc107;
-                border-radius: 10px;
-                font-size: 13px;
-                color: #856404;
-                font-weight: 500;
+                position: relative;
+                height: 4px;
+                background: #e0e0e0;
+                overflow: hidden;
             ">
-                ⚠️ 스크래핑이 완료될 때까지 기다려주세요
+                <div id="webhand-top-progress-bar" style="
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    width: 0%;
+                    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+                    transition: width 2s linear;
+                "></div>
+            </div>
+            
+            <!-- 모달 내용 -->
+            <div style="padding: 36px 28px;">
+                <div style="text-align: center; margin-bottom: 28px;">
+                    <div style="
+                        font-size: 42px;
+                        margin-bottom: 14px;
+                    ">🔍</div>
+                    <h2 id="webhand-modal-title" style="
+                        margin: 0 0 8px 0;
+                        font-size: 20px;
+                        font-weight: 700;
+                        color: #333;
+                        letter-spacing: -0.3px;
+                    ">
+                        스크래핑 진행 중
+                    </h2>
+                    <p style="
+                        margin: 0;
+                        font-size: 13px;
+                        color: #999;
+                    ">
+                        잠시만 기다려주세요
+                    </p>
+                </div>
+                
+                <!-- 간결한 안내 -->
+                <div style="
+                    padding: 14px 18px;
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                    text-align: center;
+                ">
+                    <div style="
+                        font-size: 12px;
+                        color: #666;
+                        line-height: 1.5;
+                    ">
+                        자동으로 스크롤이 움직일 수 있습니다<br>
+                        완료 후 자동으로 닫힙니다
+                    </div>
+                </div>
             </div>
         `;
 
@@ -142,18 +144,34 @@ export class ScrapeModal {
         document.body.style.overflow = 'hidden';
         document.body.style.pointerEvents = 'none';
 
-        // 시각 효과: 스크롤을 천천히 바닥으로
+        // 프로그레스 바 참조 저장
+        this.progressBar = this.modal.querySelector('#webhand-top-progress-bar');
+
+        // 프로그레스바를 2초에 걸쳐 100%로 채우기 (비동기로 시작)
+        setTimeout(() => {
+            if (this.progressBar) {
+                this.progressBar.style.width = '100%';
+            }
+        }, 50); // 약간의 지연 후 시작 (transition이 제대로 작동하도록)
+
+        // 페이지 최하단으로 스크롤 (UX)
         this.scrollToBottom();
     }
 
     /**
-     * 스크롤을 바닥으로 (시각 효과)
+     * 페이지 최하단으로 부드럽게 스크롤
      */
     private scrollToBottom() {
-        const duration = 1500; // 1.5초
+        const duration = 1500; // 1.5초 (더 천천히)
         const start = window.pageYOffset;
-        const end = document.body.scrollHeight;
+        const end = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight
+        ) - window.innerHeight;
         const distance = end - start;
+
+        if (distance <= 0) return; // 이미 하단이면 스킵
+
         const startTime = performance.now();
 
         const scroll = (currentTime: number) => {
@@ -168,11 +186,13 @@ export class ScrapeModal {
             window.scrollTo(0, start + distance * easeProgress);
 
             if (progress < 1) {
-                requestAnimationFrame(scroll);
+                this.scrollAnimationId = requestAnimationFrame(scroll);
+            } else {
+                this.scrollAnimationId = null;
             }
         };
 
-        requestAnimationFrame(scroll);
+        this.scrollAnimationId = requestAnimationFrame(scroll);
     }
 
     /**
@@ -181,63 +201,55 @@ export class ScrapeModal {
     updateProgress(progress: ScrapeProgress) {
         if (!this.modal) return;
 
-        const progressBar = this.modal.querySelector('#webhand-progress-bar') as HTMLDivElement;
-        const progressText = this.modal.querySelector('#webhand-progress-text') as HTMLDivElement;
+        const statusText = this.modal.querySelector('#webhand-status-text') as HTMLDivElement;
+        const title = this.modal.querySelector('#webhand-modal-title') as HTMLElement;
 
-        if (progressBar && progressText) {
-            if (progress.total > 0) {
-                const percent = (progress.current / progress.total) * 100;
-                progressBar.style.width = `${percent}%`;
-                progressText.textContent = `${progress.current}/${progress.total} 페이지 (${Math.round(percent)}%)`;
-            } else {
-                // total을 모르는 경우
-                progressText.textContent = progress.message || `페이지 ${progress.current} 스크래핑 중...`;
+        // 완료 또는 진행 중 시 (사용자에게는 여전히 진행중으로 표시)
+        if (progress.status === 'complete' || progress.status === 'scraping') {
+            // 타이틀과 상태는 그대로 유지 (진행중)
+            if (statusText) {
+                statusText.textContent = progress.message || '데이터 처리 중...';
             }
+            // 프로그레스바는 이미 자동으로 채워지고 있음
         }
-
-        // 완료 시 메시지 변경
-        if (progress.status === 'complete') {
-            const title = this.modal.querySelector('#webhand-title') as HTMLElement;
-            if (title) {
-                title.textContent = '✅ 스크래핑 완료!';
-                title.style.color = '#28a745';
-            }
-            if (progressText) {
-                progressText.textContent = progress.message || '결과 페이지로 이동합니다...';
-                progressText.style.color = '#28a745';
-            }
-        }
-
         // 에러 시
-        if (progress.status === 'error') {
-            const title = this.modal.querySelector('#webhand-title') as HTMLElement;
+        else if (progress.status === 'error') {
             if (title) {
                 title.textContent = '❌ 오류 발생';
                 title.style.color = '#dc3545';
             }
-            if (progressText) {
-                progressText.textContent = progress.message || '스크래핑 중 오류가 발생했습니다.';
-                progressText.style.color = '#dc3545';
+            if (statusText) {
+                statusText.textContent = progress.message || '스크래핑 중 오류가 발생했습니다.';
+                statusText.style.color = '#dc3545';
             }
+
+            if (this.progressBar) {
+                this.progressBar.style.animation = 'none';
+                this.progressBar.style.background = '#dc3545';
+            }
+        }
+        // 진행 중
+        else if (statusText) {
+            statusText.textContent = progress.message || `데이터 수집 중... (${progress.current}/${progress.total || '?'})`;
         }
     }
 
     /**
-     * 모달 숨기기
+     * 모달 숨기기 (즉시)
      */
     hide() {
-        if (this.overlay) {
-            // Fade out 효과
-            this.overlay.style.opacity = '0';
-            this.overlay.style.transition = 'opacity 0.3s ease-out';
+        // 스크롤 애니메이션 즉시 중단
+        if (this.scrollAnimationId !== null) {
+            cancelAnimationFrame(this.scrollAnimationId);
+            this.scrollAnimationId = null;
+        }
 
-            setTimeout(() => {
-                if (this.overlay) {
-                    this.overlay.remove();
-                    this.overlay = null;
-                    this.modal = null;
-                }
-            }, 300);
+        // 오버레이 즉시 제거
+        if (this.overlay) {
+            this.overlay.remove();
+            this.overlay = null;
+            this.modal = null;
+            this.progressBar = null;
         }
 
         // 스크롤 및 인터랙션 복원

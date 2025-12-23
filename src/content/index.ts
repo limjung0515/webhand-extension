@@ -73,6 +73,8 @@ console.log('🌐 WebHand Content Script loaded on:', window.location.href);
 
 // Global modal reference for stop functionality
 let currentModal: any = null;
+// Global stop flag for scraping interruption
+let shouldStop = false;
 
 // Message listener
 chrome.runtime.onMessage.addListener((
@@ -130,6 +132,17 @@ chrome.runtime.onMessage.addListener((
                 .then(sendResponse)
                 .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
             return true;
+
+        case 'STOP_SCRAPE':
+            // 스크래핑 중단 (플래그 설정 + 모달 닫기)
+            console.log('⛔ Stop scraping requested');
+            shouldStop = true;
+            if (currentModal) {
+                currentModal.hide();
+                currentModal = null;
+            }
+            sendResponse({ success: true });
+            return false;
 
         case 'SHOW_SCRAPE_MODAL':
             // 전체 페이지 스크래핑 시 모달 표시
@@ -222,8 +235,14 @@ async function handleSiteScrape(payload: any) {
     // 도매매 스크래퍼
     if (scraperId === 'domeme') {
         const scraper = new DomemeScraper();
+
+        // 중단 플래그 초기화
+        shouldStop = false;
+
         const modal = new ScrapeModal();
-        currentModal = modal; // 전역 참조 저장
+
+        // 전역 참조 저장
+        currentModal = modal;
 
         try {
             // Side Panel에 스크래핑 시작 알림
@@ -238,10 +257,16 @@ async function handleSiteScrape(payload: any) {
             let results;
 
             if (options.mode === 'current') {
-                // 현재 페이지만 (시각 효과를 위한 딜레이)
-                await new Promise(resolve => setTimeout(resolve, 1500));
-
+                // 현재 페이지만
                 results = scraper.scrapeCurrentPage();
+
+                // 중단 확인
+                if (shouldStop) {
+                    console.log('⛔ Scraping stopped by user');
+                    modal.hide();
+                    currentModal = null;
+                    return { success: false, message: 'Stopped by user' };
+                }
 
                 modal.updateProgress({
                     current: 1,
@@ -267,16 +292,34 @@ async function handleSiteScrape(payload: any) {
                 });
             }
 
-            // 결과 저장
+            // 중단 확인 (스크래핑 완료 후)
+            if (shouldStop) {
+                console.log('⛔ Scraping stopped by user before save');
+                modal.hide();
+                currentModal = null;
+                return { success: false, message: 'Stopped by user' };
+            }
+
+            // 결과 생성
             const scrapeResult = {
                 id: Date.now().toString(),
-                scraperId: 'domeme',
-                scraperName: '도매매',
+                scraperId: scraperId,
+                scraperName: scraperId === 'domeme' ? '도매매' : scraperId,
                 url: window.location.href,
+                pageTitle: document.title,
+                favicon: document.querySelector<HTMLLinkElement>('link[rel*="icon"]')?.href || '',
                 timestamp: Date.now(),
                 totalItems: results.length,
                 items: results
             };
+
+            // 진행 중 상태 유지 (사용자는 아직 진행중으로 인식)
+            modal.updateProgress({
+                current: results.length,
+                total: results.length,
+                status: 'scraping',
+                message: '데이터 처리 중...'
+            });
 
             // Chrome Storage에 저장
             await chrome.storage.local.set({
@@ -284,9 +327,25 @@ async function handleSiteScrape(payload: any) {
             });
 
             // 완료 대기 (사용자가 확인할 시간)
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 2000));
+
+            // 중단 확인 (결과 페이지 열기 전)
+            if (shouldStop) {
+                console.log('⛔ Scraping stopped by user before opening results');
+                modal.hide();
+                currentModal = null;
+                return { success: false, message: 'Stopped by user' };
+            }
 
             modal.hide();
+            currentModal = null;
+
+            // Side Panel에 완료 알림
+            chrome.runtime.sendMessage({
+                type: 'SCRAPE_COMPLETE'
+            }).catch(() => {
+                // Side Panel이 닫혀있을 수 있음
+            });
 
             // 결과 페이지 열기
             chrome.runtime.sendMessage({
