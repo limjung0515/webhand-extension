@@ -27,6 +27,12 @@ export interface ScrapingState {
     startedAt: number | null;
 }
 
+export interface StateChange {
+    timestamp: number;
+    changes: Partial<ScrapingState>;
+    changedKeys: string[];
+}
+
 type StateListener = (state: ScrapingState) => void;
 
 const DEFAULT_STATE: ScrapingState = {
@@ -47,6 +53,10 @@ export class ScrapingStateManager {
     private static instance: ScrapingStateManager;
     private listeners: Set<StateListener> = new Set();
     private static readonly STORAGE_KEY = 'scraping_state';
+
+    // 상태 히스토리 (디버깅용)
+    private history: StateChange[] = [];
+    private readonly MAX_HISTORY = 10;
 
     private constructor() {
         // 싱글톤
@@ -88,9 +98,20 @@ export class ScrapingStateManager {
                 [ScrapingStateManager.STORAGE_KEY]: newState
             });
 
-            // 상태 변경 로깅 (디버깅용)
+            // 상태 변경 히스토리 추가
             const changedKeys = Object.keys(partial);
             if (changedKeys.length > 0) {
+                this.history.push({
+                    timestamp: Date.now(),
+                    changes: partial,
+                    changedKeys
+                });
+
+                // 최대 개수 유지
+                if (this.history.length > this.MAX_HISTORY) {
+                    this.history.shift();
+                }
+
                 console.log('🔄 State updated:', changedKeys.join(', '), partial);
             }
 
@@ -107,6 +128,21 @@ export class ScrapingStateManager {
      */
     async reset(): Promise<void> {
         await this.updateState(DEFAULT_STATE);
+    }
+
+    /**
+     * 상태 히스토리 가져오기 (디버깅용)
+     */
+    getHistory(): StateChange[] {
+        return [...this.history]; // 복사본 반환
+    }
+
+    /**
+     * 히스토리 초기화
+     */
+    clearHistory(): void {
+        this.history = [];
+        console.log('🗑️ State history cleared');
     }
 
     /**
