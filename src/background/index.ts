@@ -4,6 +4,10 @@
  */
 
 import { MessageType, type Message } from '../types/messages';
+// 새로운 서비스 (기존 코드와 병행 사용)
+import { ScrapingOrchestrator } from './services/ScrapingOrchestrator';
+import { PageNavigator } from './services/PageNavigator';
+import { ResultManager } from './services/ResultManager';
 
 class DelayTimer {
     private startTime: number = 0;
@@ -122,35 +126,14 @@ async function saveAndOpenResults(payload: {
     pageTitle?: string;
     favicon?: string;
 }) {
-    const { scraperId, results, url, pageTitle, favicon } = payload;
-
-    // 결과 생성
-    const scrapeResult = {
-        id: Date.now().toString(),
-        scraperId: scraperId,
-        scraperName: scraperId.startsWith('domeme-') ? '도매매' : scraperId,
-        url: url,
-        pageTitle: pageTitle || '',
-        favicon: favicon || '',
-        timestamp: Date.now(),
-        totalItems: results.length,
-        items: results
-    };
-
-    // Chrome Storage에 저장
-    await chrome.storage.local.set({
-        [`scrape_result_${scrapeResult.id}`]: scrapeResult
-    });
-
-    console.log(`🎉 Scraping complete! Total items: ${results.length}`);
+    // 새로운 서비스 사용
+    const resultManager = new ResultManager();
+    await resultManager.saveAndOpenResults(payload);
 
     // Side Panel에 완료 알림
     chrome.runtime.sendMessage({
         type: 'SCRAPE_COMPLETE'
     }).catch(() => { });
-
-    // 결과 페이지 열기
-    await handleOpenResultPage({ resultId: scrapeResult.id });
 }
 
 // Handle stop scrape
@@ -203,6 +186,10 @@ let shouldStopAllPageScrape = false;
 // Handle all-page scraping (Background controls page navigation)
 async function handleAllPageScrape(payload: { tabId: number; scraperId: string; baseUrl: string; mode: 'current' | 'all' }) {
     const { tabId, scraperId, baseUrl, mode } = payload;
+
+    // 서비스 초기화 (향후 확장 가능)
+    const orchestrator = new ScrapingOrchestrator(3000);
+    orchestrator.reset();  // 초기화
 
     // Reset stop flag
     shouldStopAllPageScrape = false;
@@ -445,48 +432,20 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
 // Normalize URL to start from page 1 (pagenum=0)
 function normalizeStartUrl(url: string): string {
-    try {
-        const urlObj = new URL(url);
-        urlObj.searchParams.set('pagenum', '0');
-        return urlObj.toString();
-    } catch (error) {
-        console.error('Failed to normalize URL:', error);
-        return url;
-    }
+    const navigator = new PageNavigator();
+    return navigator.normalizeStartUrl(url);
 }
 
 // Build next page URL
 function buildNextPageUrl(baseUrl: string, pageNum: number): string {
-    try {
-        const urlObj = new URL(baseUrl);
-        urlObj.searchParams.set('pagenum', pageNum.toString());
-        return urlObj.toString();
-    } catch (error) {
-        console.error('Failed to build next page URL:', error);
-        return baseUrl;
-    }
+    const navigator = new PageNavigator();
+    return navigator.buildNextPageUrl(baseUrl, pageNum);
 }
 
 // Wait for page to fully load
 function waitForPageLoad(tabId: number): Promise<void> {
-    return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-            console.warn('⚠️ Page load timeout');
-            resolve();
-        }, 15000); // 15초 타임아웃
-
-        const listener = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
-            if (updatedTabId === tabId && changeInfo.status === 'complete') {
-                clearTimeout(timeout);
-                chrome.tabs.onUpdated.removeListener(listener);
-                // 페이지 로드 완료 즉시 resolve (안정화 대기 제거)
-                console.log('✅ Page loaded (status: complete)');
-                resolve();
-            }
-        };
-
-        chrome.tabs.onUpdated.addListener(listener);
-    });
+    const navigator = new PageNavigator();
+    return navigator.waitForPageLoad(tabId);
 }
 
 // async function waitForContentScript(tabId: number): Promise<void> {
