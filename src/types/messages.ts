@@ -34,3 +34,19 @@ export interface Message<T = any> {
     timestamp?: number;
 }
 
+// 타입 안전한 메시지 타입 정의
+export type StartScrapeMessage = Message<{
+    tabId: number;
+    scraperId: string;
+    baseUrl: string;
+    mode: 'current' | 'all';
+}>;
+
+export type ScrapeCompleteMessage = Message<{
+    count?: number;
+}>;
+
+export type ScrapeErrorMessage = Message<{
+    error: string;
+}>;
+
