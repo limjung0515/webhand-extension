@@ -8,6 +8,8 @@ import { MessageType, type Message } from '../types/messages';
 import { ScrapingOrchestrator } from './services/ScrapingOrchestrator';
 import { PageNavigator } from './services/PageNavigator';
 import { ResultManager } from './services/ResultManager';
+// 상태 관리 서비스
+import { ScrapingStateManager } from '../core/ScrapingStateManager';
 
 class DelayTimer {
     private startTime: number = 0;
@@ -183,6 +185,9 @@ async function handleOpenResultPage(payload: { resultId: string }) {
 // Global flags
 let shouldStopAllPageScrape = false;
 
+// 상태 관리 서비스 (점진적 마이그레이션용)
+const stateManager = ScrapingStateManager.getInstance();
+
 // Handle all-page scraping (Background controls page navigation)
 async function handleAllPageScrape(payload: { tabId: number; scraperId: string; baseUrl: string; mode: 'current' | 'all' }) {
     const { tabId, scraperId, baseUrl, mode } = payload;
@@ -191,8 +196,9 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
     const orchestrator = new ScrapingOrchestrator(3000);
     orchestrator.reset();  // 초기화
 
-    // Reset stop flag
+    // Reset stop flag (기존 + 새로운 방식 병행)
     shouldStopAllPageScrape = false;
+    await stateManager.startScraping(tabId, scraperId);  // 새로운 상태 관리
 
     // baseUrl을 정규화 (항상 pagenum=0로 설정 - 1페이지)
     const normalizedUrl = normalizeStartUrl(baseUrl);
