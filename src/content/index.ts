@@ -17,10 +17,13 @@ function log(...args: any[]) {
     console.log(`[${time}.${ms}]`, ...args);
 }
 
-// Global modal reference for stop functionality
-let currentModal: any = null;
-// Global stop flag for scraping interruption
-let shouldStop = false;
+/**
+ * Content Script 로컬 상태
+ * Background state와는 별도로 관리됨 (execution context 분리)
+ * UI 렌더링 및 로컬 제어에만 사용
+ */
+let activeModal: ScrapeModal | null = null;  // 현재 활성화된 모달 인스턴스
+let isStoppedByUser = false;  // 사용자에 의한 중단 플래그
 
 // [테스트용] count 확인해서 모달 자동 표시 함수
 async function checkAndShowModalFromCount() {
@@ -37,7 +40,7 @@ async function checkAndShowModalFromCount() {
 
             // 그 다음 모달 표시
             const modal = new ScrapeModal();
-            currentModal = modal;
+            activeModal = modal;
             modal.show();
 
             // modal.updateUnifiedProgress({
@@ -83,7 +86,7 @@ chrome.runtime.onMessage.addListener((
             log('🎬 [SHOW_MODAL] Creating modal synchronously');
 
             const modal = new ScrapeModal();
-            currentModal = modal;
+            activeModal = modal;
             modal.show();
 
             sendResponse({ success: true });
@@ -97,14 +100,14 @@ chrome.runtime.onMessage.addListener((
         case 'HIDE_MODAL':
             // Background에서 중단 메시지 받음
             console.log('⛔ Hide modal requested from Background');
-            shouldStop = true;
+            isStoppedByUser = true;
 
             // 모달 즉시 닫기
-            if (currentModal) {
+            if (activeModal) {
                 console.log('🔴 [MODAL HIDE] Via HIDE_MODAL message');
-                currentModal.hide();
+                activeModal.hide();
             }
-            currentModal = null;
+            activeModal = null;
 
             // count 리셋 (비동기 호출, await 없이)
             chrome.storage.session.set({ test_show_modal: { count: 0 } });
@@ -114,10 +117,10 @@ chrome.runtime.onMessage.addListener((
             return false;
 
         case 'RESET_STATE':
-            // Background에서 상태 리셋 요청
-            console.log('🔄 Resetting Content Script state');
-            currentModal = null;
-            shouldStop = false;
+            // Background에서 상태 리셋 요청 (새 스크래핑 세션 시작 시)
+            console.log('🔄 Resetting Content Script local state');
+            activeModal = null;
+            isStoppedByUser = false;
             sendResponse({ success: true });
             return false;
 
@@ -134,15 +137,15 @@ function executeScraping(scraperId: string): any {
 
     if (scraperId === 'domeme-products') {
         const scraper = new DomemeScraper();
-        let modal: any = currentModal; // 기존 모달 사용
+        let modal: any = activeModal; // 기존 모달 사용
 
         try {
             // 모달이 없으면 새로 생성 (현재 페이지 모드)
             // if (!modal) {
             //     console.log('🟢 [DEBUG] Creating modal...');
-            //     shouldStop = false;
+            //     isStoppedByUser = false;
             //     modal = new ScrapeModal();
-            //     currentModal = modal;
+            //     activeModal = modal;
             //     console.log('🟢 [DEBUG] Modal created, calling show()...');
             //     modal.show();
             //     console.log('🟢 [DEBUG] Modal show() called');
@@ -156,11 +159,11 @@ function executeScraping(scraperId: string): any {
             console.log('🟢 [DEBUG] Scraping complete, results:', results.length);
 
             // 중단 확인
-            if (shouldStop) {
+            if (isStoppedByUser) {
                 console.log('⛔ Scraping stopped by user');
                 console.log('🔴 [MODAL HIDE] executeScraping - stopped during scraping');
                 modal?.hide();
-                currentModal = null;
+                activeModal = null;
                 return { success: false, message: 'Stopped by user' };
             }
 
