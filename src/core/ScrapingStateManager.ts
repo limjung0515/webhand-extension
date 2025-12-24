@@ -70,8 +70,9 @@ export class ScrapingStateManager {
             const result = await chrome.storage.session.get(ScrapingStateManager.STORAGE_KEY);
             return result[ScrapingStateManager.STORAGE_KEY] || DEFAULT_STATE;
         } catch (error) {
-            console.error('Failed to get scraping state:', error);
-            return DEFAULT_STATE;
+            console.error('❌ Failed to get scraping state:', error);
+            // 에러 시 기본 상태 반환 (안전)
+            return { ...DEFAULT_STATE };
         }
     }
 
@@ -87,10 +88,17 @@ export class ScrapingStateManager {
                 [ScrapingStateManager.STORAGE_KEY]: newState
             });
 
+            // 상태 변경 로깅 (디버깅용)
+            const changedKeys = Object.keys(partial);
+            if (changedKeys.length > 0) {
+                console.log('🔄 State updated:', changedKeys.join(', '), partial);
+            }
+
             // 리스너들에게 통지
             this.notifyListeners(newState);
         } catch (error) {
-            console.error('Failed to update scraping state:', error);
+            console.error('❌ Failed to update scraping state:', error);
+            throw error; // 에러 전파
         }
     }
 
