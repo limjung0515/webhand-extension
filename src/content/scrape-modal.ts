@@ -226,40 +226,10 @@ export class ScrapeModal {
     }
 
     /**
-     * 페이지 최하단으로 부드럽게 스크롤
+     * 페이지 최하단으로 부드럽게 스크롤 (ModalAnimator 사용)
      */
     private scrollToBottom() {
-        const duration = 1500; // 1.5초 (더 천천히)
-        const start = window.pageYOffset;
-        const end = Math.max(
-            document.body.scrollHeight,
-            document.documentElement.scrollHeight
-        ) - window.innerHeight;
-        const distance = end - start;
-
-        if (distance <= 0) return; // 이미 하단이면 스킵
-
-        const startTime = performance.now();
-
-        const scroll = (currentTime: number) => {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // Easing function (ease-in-out)
-            const easeProgress = progress < 0.5
-                ? 2 * progress * progress
-                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-
-            window.scrollTo(0, start + distance * easeProgress);
-
-            if (progress < 1) {
-                this.scrollAnimationId = requestAnimationFrame(scroll);
-            } else {
-                this.scrollAnimationId = null;
-            }
-        };
-
-        this.scrollAnimationId = requestAnimationFrame(scroll);
+        this.scrollAnimationId = ModalAnimator.smoothScrollToBottom(1000);
     }
 
     /**
