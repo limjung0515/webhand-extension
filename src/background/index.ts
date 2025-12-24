@@ -144,8 +144,8 @@ async function handleStopScrape(payload: { tabId: number }) {
 
     console.log('🛑 Stopping scrape for tab:', tabId);
 
-    // 전체 페이지 스크래핑 중단 플래그 설정
-    shouldStopAllPageScrape = true;
+    // StateManager로 중단 요청
+    await stateManager.stopScraping();
 
     // Storage에 전역 중단 플래그 설정
     await chrome.storage.session.set({
@@ -182,9 +182,6 @@ async function handleOpenResultPage(payload: { resultId: string }) {
     }
 }
 
-// Global flags
-let shouldStopAllPageScrape = false;
-
 // 상태 관리 서비스 (점진적 마이그레이션용)
 const stateManager = ScrapingStateManager.getInstance();
 
@@ -197,7 +194,6 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
     orchestrator.reset();  // 초기화
 
     // Reset stop flag (기존 + 새로운 방식 병행)
-    shouldStopAllPageScrape = false;
     await stateManager.startScraping(tabId, scraperId);  // 새로운 상태 관리
 
     // baseUrl을 정규화 (항상 pagenum=0로 설정 - 1페이지)
@@ -214,8 +210,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
     try {
         // ===== 상태 초기화 (중요!) =====
-        // 1. 중단 플래그 리셋
-        shouldStopAllPageScrape = false;
+        // 중단 플래그 리셋 - StateManager는 이미 startScraping에서 초기화됨
 
         // 2. 이전 session storage 정리
         await chrome.storage.session.remove('test_show_modal');
@@ -276,8 +271,9 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
         // await new Promise(resolve => setTimeout(resolve, 3000));
 
         while (true) {
-            // 중단 확인 (루프 시작 시)
-            if (shouldStopAllPageScrape) {
+            // 중단 확인 (루프 시작 시) - StateManager 사용
+            const state = await stateManager.getState();
+            if (state.shouldStop) {
                 console.log('🛑 Scraping stopped by user (before scraping)');
 
                 // Side Panel에 완료 신호 (버튼 복구)
@@ -323,8 +319,9 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             }
 
             console.log('중단 확인')
-            // 중단 확인
-            if (shouldStopAllPageScrape) {
+            // 중단 확인 - StateManager 사용
+            const state2 = await stateManager.getState();
+            if (state2.shouldStop) {
                 console.log('🛑 Scraping stopped by user');
                 // Side Panel에 완료 신호 (버튼 복구)
                 chrome.runtime.sendMessage({
@@ -349,7 +346,9 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
             await timer.waitRemaining();
 
-            if (shouldStopAllPageScrape) {
+            // 중단 확인 - StateManager 사용
+            const state3 = await stateManager.getState();
+            if (state3.shouldStop) {
                 console.log('🛑 Scraping stopped by user (before scraping)');
 
                 // Side Panel에 완료 신호 (버튼 복구)
