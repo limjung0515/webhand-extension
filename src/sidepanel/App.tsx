@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SUPPORTED_SITES, findAllScrapersForUrl, getSiteByUrl } from '@/scrapers/registry';
-import type { ScrapeOptions, ScrapeResult } from '@/types/scraper';
+import type { ScrapeResult } from '@/types/scraper';
 
 type ScrapeMode = 'current' | 'all';
 
@@ -13,11 +13,13 @@ function App() {
     const [pageTitle, setPageTitle] = useState<string>('');
     const [favicon, setFavicon] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isStopping, setIsStopping] = useState(false);
     const [scrapeMode, setScrapeMode] = useState<ScrapeMode>('current');
     const [selectedScraperId, setSelectedScraperId] = useState<string | null>(null);
     const [showSiteDropdown, setShowSiteDropdown] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+    const [contentScriptReady, setContentScriptReady] = useState(false);
 
     // 현재 URL에 맞는 스크래퍼들
     const availableScrapers = findAllScrapersForUrl(currentUrl);
@@ -37,6 +39,7 @@ function App() {
         const handleMessage = (message: any) => {
             if (message.type === 'SCRAPE_COMPLETE') {
                 setIsLoading(false);
+                setIsStopping(false); // 중단 상태도 리셋
             }
         };
 
@@ -84,6 +87,63 @@ function App() {
             chrome.tabs.onActivated.removeListener(handleTabActivated);
             chrome.tabs.onUpdated.removeListener(handleTabUpdated);
             chrome.windows.onFocusChanged.removeListener(handleWindowFocusChanged);
+        };
+    }, []);
+
+    // Content Script 로드 상태 확인 (Ping-Pong)
+    useEffect(() => {
+        const checkContentScript = async () => {
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (!tab.id) {
+                    setContentScriptReady(false);
+                    return;
+                }
+
+                // Content Script에 PING 보내기
+                await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
+                setContentScriptReady(true);
+            } catch (error) {
+                // 응답 없으면 Content Script 미로드
+                setContentScriptReady(false);
+            }
+        };
+
+        checkContentScript();
+
+        // 1초마다 재확인
+        const interval = setInterval(checkContentScript, 1000);
+
+        return () => clearInterval(interval);
+    }, [currentUrl]);
+
+    // 페이지 로드 상태 감지 (새로고침 즉시 비활성화)
+    useEffect(() => {
+        const handleTabUpdated = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0]?.id === tabId) {
+                    if (changeInfo.status === 'loading') {
+                        // 페이지 로딩 시작 → 즉시 비활성화
+                        setContentScriptReady(false);
+                    } else if (changeInfo.status === 'complete') {
+                        // 페이지 로드 완료 → 즉시 PING 체크
+                        (async () => {
+                            try {
+                                await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+                                setContentScriptReady(true);
+                            } catch (error) {
+                                setContentScriptReady(false);
+                            }
+                        })();
+                    }
+                }
+            });
+        };
+
+        chrome.tabs.onUpdated.addListener(handleTabUpdated);
+
+        return () => {
+            chrome.tabs.onUpdated.removeListener(handleTabUpdated);
         };
     }, []);
 
@@ -156,28 +216,16 @@ function App() {
                 throw new Error('활성 탭을 찾을 수 없습니다');
             }
 
-            const options: ScrapeOptions = {
-                mode: scrapeMode
-            };
-
-            if (scrapeMode === 'all') {
-                await chrome.runtime.sendMessage({
-                    type: 'START_ALL_PAGE_SCRAPE',
-                    payload: {
-                        tabId: tab.id,
-                        scraperId: 'domeme',
-                        baseUrl: tab.url
-                    }
-                });
-            } else {
-                await chrome.tabs.sendMessage(tab.id, {
-                    type: 'START_SITE_SCRAPE',
-                    payload: {
-                        scraperId: 'domeme',
-                        options
-                    }
-                });
-            }
+            // 통합된 메시지: 현재/전체 모두 Background로 전송
+            await chrome.runtime.sendMessage({
+                type: 'START_SCRAPE',
+                payload: {
+                    tabId: tab.id,
+                    scraperId: selectedScraperId,
+                    mode: scrapeMode,  // 'current' or 'all'
+                    baseUrl: tab.url
+                }
+            });
 
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : String(err);
@@ -187,20 +235,31 @@ function App() {
         }
     };
 
+    // 중단 버튼 핸들러 (Throttling + 상태 기반 비활성화)
+
     const handleStopScrape = async () => {
+        // 즉시 비활성화 (UI 피드백)
+        setIsStopping(true);
+
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
             if (!tab.id) return;
 
-            await chrome.tabs.sendMessage(tab.id, {
-                type: 'STOP_SCRAPE'
+            // Background로 중단 메시지 전송
+            await chrome.runtime.sendMessage({
+                type: 'STOP_SCRAPE',
+                payload: { tabId: tab.id }
             });
+
+            // 성공 시 비활성화 해제
+            // setIsStopping(false);
+            // setIsLoading(false);
 
         } catch (err) {
             console.error('❌ Failed to stop scrape:', err);
-        } finally {
-            setIsLoading(false);
+            // setIsStopping(false);
+            // setIsLoading(false);
         }
     };
 
@@ -345,11 +404,11 @@ function App() {
 
                 <div className="actions">
                     <button
-                        className={isLoading ? "btn-stop" : "btn-scrape"}
+                        className={`${isLoading ? "btn-stop" : "btn-scrape"} ${isStopping ? "disabled" : ""}`}
                         onClick={isLoading ? handleStopScrape : handleStartScrape}
-                        disabled={!isActive}
+                        disabled={!isActive || (!isLoading && !contentScriptReady) || isStopping}
                     >
-                        {isLoading ? '스크래핑 중단' : '스크래핑 시작'}
+                        {isStopping ? '중단 중...' : (isLoading ? '스크래핑 중단' : '스크래핑 시작')}
                     </button>
                 </div>
             </div>

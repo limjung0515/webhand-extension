@@ -4,17 +4,66 @@
  */
 
 import type { ScrapeProgress } from '@/types/scraper';
+import type { UnifiedProgress } from '@/utils/scrape-helpers';
 
 export class ScrapeModal {
     private overlay: HTMLDivElement | null = null;
     private modal: HTMLDivElement | null = null;
     private progressBar: HTMLDivElement | null = null;
     private scrollAnimationId: number | null = null;
+    private currentCount: number = 0; // 현재 표시 중인 숫자 (애니메이션용)
+    // private pollingInterval: number | null = null;
+
+    /**
+     * 숫자 카운트업 애니메이션
+     */
+    private animateCount(targetCount: number, duration: number = 600) {
+        const startCount = this.currentCount;
+        const startTime = Date.now();
+
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // easing: 빠르게 시작, 천천히 끝 (ease-out cubic)
+            // const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+            // ease-in-out (천천히 시작 → 빠르게 → 천천히 끝)
+            const easedProgress = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+            this.currentCount = Math.floor(startCount + (targetCount - startCount) * easedProgress);
+
+            // DOM 업데이트 (올바른 selector 사용)
+            const itemsElement = this.modal?.querySelector('#webhand-items-collected');
+            if (itemsElement) {
+                itemsElement.textContent = `${this.currentCount}개`;
+            }
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // 애니메이션 완료 시 정확한 값으로 설정
+                this.currentCount = targetCount;
+                const itemsElement = this.modal?.querySelector('#webhand-items-collected');
+                if (itemsElement) {
+                    itemsElement.textContent = `${targetCount}개`;
+                }
+            }
+        };
+
+        requestAnimationFrame(animate);
+    }
+
 
     /**
      * 모달 표시
      */
     show() {
+        // 페이지 최상단으로 스크롤
+        window.scrollTo({ top: 0, behavior: 'instant' });
+
         // 전체 화면 블러 오버레이
         this.overlay = document.createElement('div');
         this.overlay.id = 'webhand-scrape-overlay';
@@ -45,10 +94,11 @@ export class ScrapeModal {
         this.modal.id = 'webhand-scrape-modal';
         this.modal.style.cssText = `
             position: relative;
-            background: white;
+            background: #2d2f33;
+            border: 1px solid #3a3b40;
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
             min-width: 450px;
             max-width: 500px;
         `;
@@ -94,8 +144,8 @@ export class ScrapeModal {
             </div>
             
             <!-- 모달 내용 -->
-            <div style="padding: 36px 28px;">
-                <div style="text-align: center; margin-bottom: 28px;">
+            <div style="padding: 32px 24px;">
+                <div style="text-align: center; margin-bottom: 24px;">
                     <div style="
                         font-size: 42px;
                         margin-bottom: 14px;
@@ -104,35 +154,126 @@ export class ScrapeModal {
                         margin: 0 0 8px 0;
                         font-size: 20px;
                         font-weight: 700;
-                        color: #333;
+                        color: #e8e8e8;
                         letter-spacing: -0.3px;
                     ">
-                        스크래핑 진행 중
+                        스크래핑 준비 중
                     </h2>
-                    <p style="
+                    <p id="webhand-modal-subtitle" style="
                         margin: 0;
                         font-size: 13px;
-                        color: #999;
+                        color: #b8b8b8;
                     ">
                         잠시만 기다려주세요
                     </p>
                 </div>
                 
-                <!-- 간결한 안내 -->
-                <div style="
+                <!-- 진행상황 통계 -->
+                <div id="webhand-progress-stats" style="
+                    display: none;
+                    padding: 16px;
+                    background: #242528;
+                    border-radius: 8px;
+                    margin-bottom: 16px;
+                ">
+                    <div style="
+                        display: flex;
+                        justify-content: space-around;
+                        gap: 16px;
+                    ">
+                        <div style="
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            gap: 6px;
+                        ">
+                            <div style="
+                                font-size: 12px;
+                                color: #9ca3af;
+                            ">진행률</div>
+                            <div id="webhand-page-progress" style="
+                                font-size: 18px;
+                                font-weight: 600;
+                                color: #e8e8e8;
+                            ">1 페이지</div>
+                        </div>
+                        <div style="
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            gap: 6px;
+                        ">
+                            <div style="
+                                font-size: 12px;
+                                color: #9ca3af;
+                            ">수집</div>
+                            <div id="webhand-items-collected" style="
+                                font-size: 18px;
+                                font-weight: 600;
+                                color: #e8e8e8;
+                            ">0개</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 진행률 바 (전체 페이지 모드만) -->
+                    <div id="webhand-progress-bar-container" style="
+                        display: none;
+                        margin-top: 16px;
+                    ">
+                        <div style="
+                            width: 100%;
+                            height: 6px;
+                            background: #3a3b40;
+                            border-radius: 3px;
+                            overflow: hidden;
+                        ">
+                            <div id="webhand-progress-bar-fill" style="
+                                height: 100%;
+                                width: 0%;
+                                background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
+                                transition: width 0.3s ease;
+                                border-radius: 3px;
+                            "></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 상태 메시지 -->
+                <div id="webhand-status-message" style="
                     padding: 14px 18px;
-                    background: #f8f9fa;
+                    background: #242528;
                     border-radius: 8px;
                     text-align: center;
                 ">
                     <div style="
                         font-size: 12px;
-                        color: #666;
+                        color: #b8b8b8;
                         line-height: 1.5;
                     ">
                         자동으로 스크롤이 움직일 수 있습니다<br>
                         완료 후 자동으로 닫힙니다
                     </div>
+                </div>
+                
+                <!-- 중단 버튼 -->
+                <div id="webhand-stop-button-container" style="
+                    margin-top: 16px;
+                    text-align: center;
+                    display: none;
+                ">
+                    <button id="webhand-stop-button" style="
+                        padding: 10px 24px;
+                        font-size: 14px;
+                        font-weight: 500;
+                        background: rgba(239, 68, 68, 0.2);
+                        color: #ef4444;
+                        border: 1px solid rgba(239, 68, 68, 0.3);
+                        border-radius: 6px;
+                        cursor: pointer;
+                        transition: all 0.15s;
+                    ">
+                        중단하기
+                    </button>
                 </div>
             </div>
         `;
@@ -147,15 +288,10 @@ export class ScrapeModal {
         // 프로그레스 바 참조 저장
         this.progressBar = this.modal.querySelector('#webhand-top-progress-bar');
 
-        // 프로그레스바를 2초에 걸쳐 100%로 채우기 (비동기로 시작)
-        setTimeout(() => {
-            if (this.progressBar) {
-                this.progressBar.style.width = '100%';
-            }
-        }, 50); // 약간의 지연 후 시작 (transition이 제대로 작동하도록)
+        // 스크래핑 중단 플래그 폴링 시작
+        // this.startPolling();
 
-        // 페이지 최하단으로 스크롤 (UX)
-        this.scrollToBottom();
+        // NOTE: 프로그레스바와 스크롤은 updateUnifiedProgress()에서 시작
     }
 
     /**
@@ -235,9 +371,88 @@ export class ScrapeModal {
     }
 
     /**
+     * 통합 진행률 업데이트 (단일/전체 페이지 모두 지원)
+     */
+    updateUnifiedProgress(progress: UnifiedProgress) {
+        if (!this.modal) return;
+
+        const statsContainer = this.modal.querySelector('#webhand-progress-stats') as HTMLDivElement;
+        const pageProgress = this.modal.querySelector('#webhand-page-progress') as HTMLDivElement;
+        const itemsCollected = this.modal.querySelector('#webhand-items-collected') as HTMLDivElement;
+        const progressBarContainer = this.modal.querySelector('#webhand-progress-bar-container') as HTMLDivElement;
+        const progressBarFill = this.modal.querySelector('#webhand-progress-bar-fill') as HTMLDivElement;
+        const statusMessage = this.modal.querySelector('#webhand-status-message') as HTMLDivElement;
+        const subtitle = this.modal.querySelector('#webhand-modal-subtitle') as HTMLElement;
+
+        // 첫 업데이트 시 프로그레스바와 스크롤 시작
+        if (this.progressBar && this.progressBar.style.width === '0%') {
+            // 프로그레스바를 2초에 걸쳐 100%로 채우기
+            setTimeout(() => {
+                if (this.progressBar) {
+                    this.progressBar.style.width = '100%';
+                }
+            }, 50);
+
+            // 페이지 최하단으로 스크롤
+            this.scrollToBottom();
+        }
+
+        // 통계 표시
+        if (statsContainer) {
+            statsContainer.style.display = 'block';
+        }
+
+        // 페이지 진행률
+        if (pageProgress) {
+            if (progress.mode === 'multi' && progress.totalPages) {
+                pageProgress.textContent = `${progress.currentPage}/${progress.totalPages} 페이지`;
+            } else {
+                pageProgress.textContent = `${progress.currentPage} 페이지`;
+            }
+        }
+
+        // 수집 아이템 (애니메이션 적용)
+        if (itemsCollected) {
+            // 애니메이션으로 숫자 변경
+            this.animateCount(progress.itemsCollected - 1, 2000);
+        }
+
+        // 진행률 바 (전체 페이지 모드만)
+        if (progress.mode === 'multi' && progress.totalPages && progressBarContainer && progressBarFill) {
+            progressBarContainer.style.display = 'block';
+            const percentage = (progress.currentPage / progress.totalPages) * 100;
+            progressBarFill.style.width = `${percentage}%`;
+        }
+
+        // 상태 메시지
+        if (statusMessage && progress.message) {
+            const messageDiv = statusMessage.querySelector('div');
+            if (messageDiv) {
+                messageDiv.innerHTML = progress.message;
+            }
+        }
+
+        // 서브타이틀 업데이트
+        if (subtitle) {
+            if (progress.status === 'complete') {
+                subtitle.textContent = '완료되었습니다!';
+                subtitle.style.color = '#10b981';
+            } else if (progress.status === 'error') {
+                subtitle.textContent = '오류가 발생했습니다';
+                subtitle.style.color = '#ef4444';
+            } else {
+                subtitle.textContent = progress.mode === 'multi' ? '전체 페이지 스크래핑 중...' : '데이터를 수집하고 있습니다';
+            }
+        }
+    }
+
+    /**
      * 모달 숨기기 (즉시)
      */
     hide() {
+        // 폴링 중단
+        // this.stopPolling();
+
         // 스크롤 애니메이션 즉시 중단
         if (this.scrollAnimationId !== null) {
             cancelAnimationFrame(this.scrollAnimationId);
@@ -255,5 +470,47 @@ export class ScrapeModal {
         // 스크롤 및 인터랙션 복원
         document.body.style.overflow = '';
         document.body.style.pointerEvents = '';
+
+        // count 리셋 (다음 모달에서 0부터 시작)
+        this.currentCount = 0;
+
+        // 중단 플래그 정리 (centralized cleanup)
+        chrome.storage.session.remove('stop_all_scraping').catch(() => { });
     }
+
+    // /**
+    //  * 폴링 시작 - chrome.storage.session에서 전역 중단 플래그 확인 (200ms마다)
+    //  */
+    // startPolling() {
+    //     // 이미 폴링 중이면 무시 (중복 방지)
+    //     if (this.pollingInterval !== null) {
+    //         console.warn('⚠️ Polling already active, skipping');
+    //         return;
+    //     }
+
+    //     this.pollingInterval = window.setInterval(async () => {
+    //         try {
+    //             const result = await chrome.storage.session.get('stop_all_scraping');
+    //             if (result.stop_all_scraping) {
+    //                 console.log('🛑 Polling detected global stop flag - hiding modal');
+    //                 this.hide();
+    //             }
+    //         } catch (error) {
+    //             console.warn('Polling error:', error);
+    //         }
+    //     }, 200);
+
+    //     console.log('✅ Modal polling started (200ms interval)');
+    // }
+
+    // /**
+    //  * 폴링 중단
+    //  */
+    // private stopPolling() {
+    //     if (this.pollingInterval !== null) {
+    //         clearInterval(this.pollingInterval);
+    //         this.pollingInterval = null;
+    //         console.log('⏹️ Modal polling stopped');
+    //     }
+    // }
 }

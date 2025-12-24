@@ -1,11 +1,13 @@
 // Message types for cross-script communication
 export enum MessageType {
-    // Scraping
-    START_SCRAPE = 'START_SCRAPE',
+    // Scraping (unified)
+    START_SCRAPE = 'START_SCRAPE',  // Side Panel → Background
     STOP_SCRAPE = 'STOP_SCRAPE',
-    SCRAPE_PROGRESS = 'SCRAPE_PROGRESS',
     SCRAPE_COMPLETE = 'SCRAPE_COMPLETE',
     SCRAPE_ERROR = 'SCRAPE_ERROR',
+
+    // Site-specific scraping
+    START_SITE_SCRAPE = 'START_SITE_SCRAPE',
 
     // Page Reading
     READ_PAGE = 'READ_PAGE',
@@ -32,14 +34,3 @@ export interface Message<T = any> {
     timestamp?: number;
 }
 
-export interface ScrapeConfig {
-    url: string;
-    fields?: string[];
-    maxPages?: number;
-    useAI?: boolean;
-}
-
-export interface ScrapeProgress {
-    current: number;
-    total: number;
-}

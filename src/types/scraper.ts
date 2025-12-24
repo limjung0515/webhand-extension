@@ -2,17 +2,10 @@
  * Scraper Types
  */
 
-export interface ScraperConfig {
-    id: string;
-    name: string;
-    url: string;
-    favicon: string;
-    matcher: (url: string) => boolean;
-}
-
 export interface ScrapeOptions {
     mode: 'current' | 'all';
 }
+
 
 export interface ScrapeProgress {
     current: number;

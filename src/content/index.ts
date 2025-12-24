@@ -5,76 +5,58 @@
 
 import { DomemeScraper } from '@/scrapers/domeme';
 import { ScrapeModal } from './scrape-modal';
-
-// Inline message types to avoid imports
-const MessageType = {
-    START_SCRAPE: 'START_SCRAPE',
-    STOP_SCRAPE: 'STOP_SCRAPE',
-    SCRAPE_PROGRESS: 'SCRAPE_PROGRESS',
-    SCRAPE_COMPLETE: 'SCRAPE_COMPLETE',
-    SCRAPE_ERROR: 'SCRAPE_ERROR',
-    READ_PAGE: 'READ_PAGE',
-    READ_PAGE_RESPONSE: 'READ_PAGE_RESPONSE',
-    OPEN_SIDE_PANEL: 'OPEN_SIDE_PANEL',
-    CLOSE_SIDE_PANEL: 'CLOSE_SIDE_PANEL',
-    SAVE_DATA: 'SAVE_DATA',
-    LOAD_DATA: 'LOAD_DATA',
-    UPDATE_SETTINGS: 'UPDATE_SETTINGS',
-    START_SITE_SCRAPE: 'START_SITE_SCRAPE',
-} as const;
-
-// Inline utility functions
-function safeQuerySelectorAll<T extends Element = Element>(
-    selector: string,
-    parent: Document | Element = document
-): T[] {
-    try {
-        return Array.from(parent.querySelectorAll<T>(selector));
-    } catch (error) {
-        console.error('querySelectorAll failed:', error);
-        return [];
-    }
-}
-
-function extractText(element: Element): string {
-    if (!element) return '';
-
-    let text = '';
-
-    for (const node of element.childNodes) {
-        if (node.nodeType === Node.TEXT_NODE) {
-            const content = node.textContent
-                ?.replace(/\s\s+/g, ' ')
-                .replace(/\n/g, ' ')
-                .trim();
-
-            if (content && content.length > 0) {
-                text += content + ' ';
-            }
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-            const el = node as Element;
-
-            // Skip hidden or script elements
-            if (
-                el.classList?.contains('visually-hidden') ||
-                /^(script|style|noscript)$/i.test(el.tagName)
-            ) {
-                continue;
-            }
-
-            text += extractText(el);
-        }
-    }
-
-    return text.replace(/\s\s+/g, ' ').trim();
-}
+import { MessageType } from '@/types/messages';
 
 console.log('🌐 WebHand Content Script loaded on:', window.location.href);
+
+// Timestamped console log utility
+function log(...args: any[]) {
+    const now = new Date();
+    const time = now.toTimeString().split(' ')[0]; // HH:MM:SS
+    const ms = now.getMilliseconds().toString().padStart(3, '0');
+    console.log(`[${time}.${ms}]`, ...args);
+}
 
 // Global modal reference for stop functionality
 let currentModal: any = null;
 // Global stop flag for scraping interruption
 let shouldStop = false;
+
+// [테스트용] count 확인해서 모달 자동 표시 함수
+async function checkAndShowModalFromCount() {
+    try {
+        const result = await chrome.storage.session.get('test_show_modal');
+        if (result.test_show_modal && result.test_show_modal.count > 0) {
+            log('🎬 [COUNT] Auto-showing modal (count:', result.test_show_modal.count, ')');
+
+            // count 감소 먼저! (중복 실행 방지)
+            await chrome.storage.session.set({
+                test_show_modal: { ...result.test_show_modal, count: 0 }
+            });
+            log('✅ Modal count decremented to 0');
+
+            // 그 다음 모달 표시
+            const modal = new ScrapeModal();
+            currentModal = modal;
+            modal.show();
+
+            // modal.updateUnifiedProgress({
+            //     mode: 'multi',
+            //     status: 'scraping',
+            //     currentPage: result.test_show_modal.currentPage || 1,
+            //     totalPages: result.test_show_modal.totalPages || null,
+            //     itemsCollected: 0,
+            //     message: '페이지 로딩 중...'
+            // });
+        }
+    } catch (error) {
+        console.log(error);
+        // 에러 무시
+    }
+}
+
+// 페이지 로드 시 자동 실행
+checkAndShowModalFromCount();
 
 // Message listener
 chrome.runtime.onMessage.addListener((
@@ -85,74 +67,57 @@ chrome.runtime.onMessage.addListener((
     console.log('📨 Message received in content script:', message.type);
 
     switch (message.type) {
-        case MessageType.START_SCRAPE:
-            handleStartScrape(message.payload)
-                .then(sendResponse)
-                .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
-            return true; // Async response
-
-        case MessageType.READ_PAGE:
-            handleReadPage()
-                .then(sendResponse)
-                .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
-            return true;
-
         case MessageType.START_SITE_SCRAPE:
-            // Background에서 제어하는 전체 페이지 스크래핑 (current 모드로 각 페이지만 스크래핑)
-            if (message.payload.options?.mode === 'current' && message.payload._fromBackground) {
-                // Background에서 호출: 결과만 동기적으로 반환
-                handleSiteScrapeSync(message.payload)
-                    .then(sendResponse)
-                    .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
-                return true;
-            } else if (message.payload.options?.mode === 'current') {
-                // 사용자가 직접 호출: 모달 표시 + 결과 저장 + 결과 페이지
-                sendResponse({ success: true, message: 'Scraping started' });
-                handleSiteScrape(message.payload).catch(error => {
-                    console.error('❌ Site scrape error:', error);
-                });
-                return false;
-            } else {
-                // 전체 페이지 모드 (deprecated - 이제 Background에서 처리)
-                sendResponse({ success: true, message: 'Scraping started' });
-                handleSiteScrape(message.payload).catch(error => {
-                    console.error('❌ Site scrape error:', error);
-                });
-                return false;
+            console.log('#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#')
+            // 동기 실행
+            try {
+                const result = executeScraping(message.payload.scraperId);
+                sendResponse(result);
+            } catch (error: any) {
+                sendResponse({ error: error instanceof Error ? error.message : String(error) });
             }
+            return false; // 동기 응답!
 
-        case 'CHECK_NEXT_PAGE':
-            handleCheckNextPage(message.payload)
-                .then(sendResponse)
-                .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
-            return true;
+        case 'SHOW_MODAL':
+            // 동기 방식: 즉시 모달 생성 (count 체크 없이)
+            log('🎬 [SHOW_MODAL] Creating modal synchronously');
 
-        case 'GO_TO_NEXT_PAGE':
-            handleGoToNextPage(message.payload)
-                .then(sendResponse)
-                .catch(error => sendResponse({ error: error instanceof Error ? error.message : String(error) }));
-            return true;
+            const modal = new ScrapeModal();
+            currentModal = modal;
+            modal.show();
 
-        case 'STOP_SCRAPE':
-            // 스크래핑 중단 (플래그 설정 + 모달 닫기)
-            console.log('⛔ Stop scraping requested');
+            sendResponse({ success: true });
+            return false; // 동기 응답
+
+        case 'PING':
+            // Side Panel에서 Content Script 로드 상태 확인용
+            sendResponse({ ready: true });
+            return false;
+
+        case 'HIDE_MODAL':
+            // Background에서 중단 메시지 받음
+            console.log('⛔ Hide modal requested from Background');
             shouldStop = true;
+
+            // 모달 즉시 닫기
             if (currentModal) {
+                console.log('🔴 [MODAL HIDE] Via HIDE_MODAL message');
                 currentModal.hide();
-                currentModal = null;
             }
+            currentModal = null;
+
+            // count 리셋 (비동기 호출, await 없이)
+            chrome.storage.session.set({ test_show_modal: { count: 0 } });
+
             sendResponse({ success: true });
+
             return false;
 
-        case 'SHOW_SCRAPE_MODAL':
-            // 전체 페이지 스크래핑 시 모달 표시
-            handleShowModal();
-            sendResponse({ success: true });
-            return false;
-
-        case 'STOP_CONTENT_SCRAPE':
-            // 현재 페이지 스크래핑 중단 (모달 숨기기)
-            handleStopContentScrape();
+        case 'RESET_STATE':
+            // Background에서 상태 리셋 요청
+            console.log('🔄 Resetting Content Script state');
+            currentModal = null;
+            shouldStop = false;
             sendResponse({ success: true });
             return false;
 
@@ -163,208 +128,81 @@ chrome.runtime.onMessage.addListener((
     return false;
 });
 
-// Start scraping
-async function handleStartScrape(config: any) {
-    console.log('🔧 Starting scrape...', config);
+// Unified scraping function
+function executeScraping(scraperId: string): any {
+    console.log(`🎯 Starting scraping: ${scraperId}`);
 
-    try {
-        const data = {
-            url: window.location.href,
-            title: document.title,
-            timestamp: Date.now(),
-            fields: {
-                // Basic extraction
-                bodyText: extractText(document.body).substring(0, 1000),
-                headings: safeQuerySelectorAll('h1, h2, h3')
-                    .map(el => el.textContent?.trim())
-                    .filter(Boolean)
-            }
-        };
-
-        // Send progress update
-        chrome.runtime.sendMessage({
-            type: MessageType.SCRAPE_PROGRESS,
-            payload: { current: 1, total: 1 }
-        });
-
-        // Send completion
-        chrome.runtime.sendMessage({
-            type: MessageType.SCRAPE_COMPLETE,
-            payload: { data: [data] }
-        });
-
-        return { success: true, data: [data] };
-    } catch (error) {
-        console.error('❌ Scrape error:', error);
-
-        chrome.runtime.sendMessage({
-            type: MessageType.SCRAPE_ERROR,
-            payload: { error: error instanceof Error ? error.message : String(error) }
-        });
-
-        throw error;
-    }
-}
-
-// Read page content
-async function handleReadPage() {
-    console.log('📖 Reading page content...');
-
-    const content = {
-        url: window.location.href,
-        title: document.title,
-        text: extractText(document.body),
-        links: safeQuerySelectorAll('a')
-            .map(a => ({
-                text: (a as HTMLAnchorElement).textContent?.trim(),
-                href: (a as HTMLAnchorElement).href
-            }))
-            .filter(link => link.text && link.href)
-            .slice(0, 50) // Limit to 50 links
-    };
-
-    return { success: true, content };
-}
-
-// Site-specific scraping
-async function handleSiteScrape(payload: any) {
-    console.log('🎯 Starting site scrape:', payload);
-
-    const { scraperId, options } = payload;
-
-    // 도매매 스크래퍼
-    if (scraperId === 'domeme') {
+    if (scraperId === 'domeme-products') {
         const scraper = new DomemeScraper();
-
-        // 중단 플래그 초기화
-        shouldStop = false;
-
-        const modal = new ScrapeModal();
-
-        // 전역 참조 저장
-        currentModal = modal;
+        let modal: any = currentModal; // 기존 모달 사용
 
         try {
-            // Side Panel에 스크래핑 시작 알림
-            chrome.runtime.sendMessage({
-                type: 'SCRAPE_STARTED'
-            }).catch(() => {
-                // Side Panel이 닫혀있을 수 있음
-            });
+            // 모달이 없으면 새로 생성 (현재 페이지 모드)
+            // if (!modal) {
+            //     console.log('🟢 [DEBUG] Creating modal...');
+            //     shouldStop = false;
+            //     modal = new ScrapeModal();
+            //     currentModal = modal;
+            //     console.log('🟢 [DEBUG] Modal created, calling show()...');
+            //     modal.show();
+            //     console.log('🟢 [DEBUG] Modal show() called');
+            // } else {
+            //     console.log('🟢 [DEBUG] Using existing modal');
+            // }
 
-            modal.show();
+            // 스크래핑 실행
+            console.log('🟢 [DEBUG] Starting scraping...');
+            const results = scraper.scrapeCurrentPage();
+            console.log('🟢 [DEBUG] Scraping complete, results:', results.length);
 
-            let results;
-
-            if (options.mode === 'current') {
-                // 현재 페이지만
-                results = scraper.scrapeCurrentPage();
-
-                // 중단 확인
-                if (shouldStop) {
-                    console.log('⛔ Scraping stopped by user');
-                    modal.hide();
-                    currentModal = null;
-                    return { success: false, message: 'Stopped by user' };
-                }
-
-                modal.updateProgress({
-                    current: 1,
-                    total: 1,
-                    status: 'complete',
-                    message: '스크래핑 완료!'
-                });
-            } else {
-                // 전체 페이지
-                results = await scraper.scrapeAllPages((progress) => {
-                    modal.updateProgress(progress);
-
-                    // Background에도 전송 (페이지 이동 시 연결이 끊어질 수 있음)
-                    try {
-                        chrome.runtime.sendMessage({
-                            type: MessageType.SCRAPE_PROGRESS,
-                            payload: progress
-                        });
-                    } catch (error) {
-                        // 페이지 이동 중 연결이 끊어진 경우 무시
-                        console.log('⚠️ Message channel disconnected (expected during page navigation)');
-                    }
-                });
-            }
-
-            // 중단 확인 (스크래핑 완료 후)
+            // 중단 확인
             if (shouldStop) {
-                console.log('⛔ Scraping stopped by user before save');
-                modal.hide();
+                console.log('⛔ Scraping stopped by user');
+                console.log('🔴 [MODAL HIDE] executeScraping - stopped during scraping');
+                modal?.hide();
                 currentModal = null;
                 return { success: false, message: 'Stopped by user' };
             }
 
-            // 결과 생성
-            const scrapeResult = {
-                id: Date.now().toString(),
-                scraperId: scraperId,
-                scraperName: scraperId === 'domeme' ? '도매매' : scraperId,
-                url: window.location.href,
-                pageTitle: document.title,
-                favicon: document.querySelector<HTMLLinkElement>('link[rel*="icon"]')?.href || '',
-                timestamp: Date.now(),
-                totalItems: results.length,
-                items: results
+            console.log('modal');
+            console.log(modal)
+            // 진행상황 표시
+            if (modal) {
+                modal.updateUnifiedProgress({
+                    mode: 'single',
+                    status: 'scraping',
+                    currentPage: 1,
+                    totalPages: 10,
+                    itemsCollected: results.length,
+                    // message: `${results.length}개 수집 완료`
+                    message: `잠시만요! 완료되면 결과를 보여드릴게요`
+                });
+            }
+
+            // 결과 + 다음 페이지 정보 반환
+            const nextButton = scraper.findNextButton();
+            const hasNextPage = nextButton !== null;
+            console.log('🔍 Next button:', nextButton?.getAttribute('href'));
+            console.log('📋 hasNextPage:', hasNextPage);
+
+            return {
+                success: true,
+                results: results,
+                hasNextPage: hasNextPage
             };
 
-            // 진행 중 상태 유지 (사용자는 아직 진행중으로 인식)
-            modal.updateProgress({
-                current: results.length,
-                total: results.length,
-                status: 'scraping',
-                message: '데이터 처리 중...'
-            });
-
-            // Chrome Storage에 저장
-            await chrome.storage.local.set({
-                [`scrape_result_${scrapeResult.id}`]: scrapeResult
-            });
-
-            // 완료 대기 (사용자가 확인할 시간)
-            await new Promise(r => setTimeout(r, 2000));
-
-            // 중단 확인 (결과 페이지 열기 전)
-            if (shouldStop) {
-                console.log('⛔ Scraping stopped by user before opening results');
-                modal.hide();
-                currentModal = null;
-                return { success: false, message: 'Stopped by user' };
-            }
-
-            modal.hide();
-            currentModal = null;
-
-            // Side Panel에 완료 알림
-            chrome.runtime.sendMessage({
-                type: 'SCRAPE_COMPLETE'
-            }).catch(() => {
-                // Side Panel이 닫혀있을 수 있음
-            });
-
-            // 결과 페이지 열기
-            chrome.runtime.sendMessage({
-                type: 'OPEN_RESULT_PAGE',
-                payload: { resultId: scrapeResult.id }
-            });
-
-            return { success: true, resultId: scrapeResult.id };
-
         } catch (error) {
-            modal.updateProgress({
-                current: 0,
-                total: 0,
-                status: 'error',
-                message: error instanceof Error ? error.message : '알 수 없는 오류'
-            });
+            if (modal) {
+                modal.updateProgress({
+                    current: 0,
+                    total: 0,
+                    status: 'error',
+                    message: error instanceof Error ? error.message : '알 수 없는 오류'
+                });
 
-            await new Promise(r => setTimeout(r, 2000));
-            modal.hide();
+                // 에러 표시 후 즉시 던지기
+                modal.hide();
+            }
 
             throw error;
         }
@@ -428,68 +266,6 @@ function injectOpenButton() {
     }
 }
 
-// Handle site scrape synchronously (for current page mode)
-async function handleSiteScrapeSync(payload: any) {
-    console.log('🎯 Starting site scrape (sync):', payload);
-
-    const { scraperId } = payload;
-
-    if (scraperId === 'domeme') {
-        const scraper = new DomemeScraper();
-
-        try {
-            const results = scraper.scrapeCurrentPage();
-
-            return {
-                success: true,
-                results: results
-            };
-        } catch (error) {
-            throw error;
-        }
-    }
-
-    throw new Error('Unsupported scraper: ' + scraperId);
-}
-
-// Check if next page exists
-async function handleCheckNextPage(payload: any) {
-    console.log('🔍 Checking for next page:', payload);
-
-    const { scraperId } = payload;
-
-    if (scraperId === 'domeme') {
-        const scraper = new DomemeScraper();
-        const nextButton = (scraper as any).findNextButton();
-        return nextButton !== null;
-    }
-
-    return false;
-}
-
-// Go to next page
-async function handleGoToNextPage(payload: any) {
-    console.log('➡️ Going to next page:', payload);
-
-    const { scraperId } = payload;
-
-    if (scraperId === 'domeme') {
-        const scraper = new DomemeScraper();
-        const nextButton = (scraper as any).findNextButton();
-
-        if (nextButton) {
-            nextButton.click();
-            // Wait for page to load
-            await (scraper as any).waitForPageLoad();
-            return { success: true };
-        }
-
-        return { success: false, message: 'No next button found' };
-    }
-
-    return { success: false, message: 'Unsupported scraper' };
-}
-
 // Initialize with multiple safety checks
 function initialize() {
     if (document.readyState === 'loading') {
@@ -504,21 +280,3 @@ function initialize() {
 // Start initialization
 initialize();
 
-// Handle stop content scrape
-function handleStopContentScrape() {
-    console.log('⛔ Stopping content scrape');
-    if (currentModal) {
-        currentModal.hide();
-        currentModal = null;
-    }
-}
-
-// Handle show modal (for background-initiated scraping)
-function handleShowModal() {
-    console.log('📺 Showing scrape modal');
-    if (!currentModal) {
-        const modal = new ScrapeModal();
-        currentModal = modal;
-        modal.show();
-    }
-}

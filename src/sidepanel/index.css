@@ -408,6 +408,29 @@ body {
     transform: translateY(0);
 }
 
+/* 중단 중일 때 (disabled) */
+.btn-stop.disabled,
+.btn-stop:disabled {
+    background: #9ca3af !important;
+    color: #6b7280 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* Warning Message */
+.warning-message {
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 8px;
+    color: #fbbf24;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+}
+
 /* ============================= */
 /* History Modal */
 /* ============================= */
@@ -684,4 +707,91 @@ body {
 .delete-btn:hover {
     background: rgba(239, 68, 68, 0.15);
     color: #ef4444;
+}
+
+/* ============================= */
+/* All-Page Scraping Progress */
+/* ============================= */
+
+.all-page-progress {
+    margin: 16px;
+    padding: 16px;
+    background: #2d2f33;
+    border: 1px solid #3a3b40;
+    border-radius: 10px;
+}
+
+.progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.progress-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e8e8e8;
+}
+
+.progress-stop-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.progress-stop-btn:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: #ef4444;
+}
+
+.progress-stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 12px;
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e8e8e8;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #3a3b40;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.progress-message {
+    font-size: 13px;
+    color: #b8b8b8;
+    margin-top: 8px;
 }

@@ -1,14 +1,5 @@
-import type { ScraperConfig } from '@/types/scraper-config';
+import type { ScraperConfig, SupportedSite } from '@/types/scraper-config';
 
-/**
- * 지원 사이트 정보
- */
-export interface SupportedSite {
-    name: string;
-    domain: string;
-    url: string;
-    icon: string;
-}
 
 /**
  * 지원 사이트 목록
