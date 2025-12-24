@@ -147,11 +147,6 @@ async function handleStopScrape(payload: { tabId: number }) {
     // StateManager로 중단 요청
     await stateManager.stopScraping();
 
-    // Storage에 전역 중단 플래그 설정
-    await chrome.storage.session.set({
-        stop_all_scraping: true
-    });
-
     // Content Script에 모달 닫기 메시지 전송
     try {
         await chrome.tabs.sendMessage(tabId, {
@@ -210,13 +205,9 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
     try {
         // ===== 상태 초기화 (중요!) =====
-        // 중단 플래그 리셋 - StateManager는 이미 startScraping에서 초기화됨
+        // StateManager가 이미 startScraping()에서 상태를 초기화함
 
-        // 2. 이전 session storage 정리
-        await chrome.storage.session.remove('test_show_modal');
-        await chrome.storage.session.remove('stop_all_scraping');
-
-        // 3. Content Script 전역 변수 리셋 메시지 (선택적)
+        // Content Script 전역 변수 리셋 메시지
         try {
             await chrome.tabs.sendMessage(tabId, { type: 'RESET_STATE' });
         } catch {
