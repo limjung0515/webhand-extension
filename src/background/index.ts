@@ -216,14 +216,8 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
         console.log('✅ State initialized for new scraping session');
 
-        // 4. 모달 카운트 설정
-        await chrome.storage.session.set({
-            test_show_modal: {
-                count: 1,
-                currentPage: currentPage + 1,
-                totalPages: null
-            }
-        });
+        // 모달 상태 설정 - StateManager 사용
+        await stateManager.showModal(currentPage + 1, null);
 
         // 전체 페이지 모드: 첫 페이지로 이동
         if (mode === 'all') {
@@ -359,17 +353,10 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             currentPage++;
             const nextPageUrl = buildNextPageUrl(normalizedUrl, currentPage);
 
-            console.log(`🔄 Navigating to page ${currentPage + 1} (pagenum=${currentPage}): ${nextPageUrl}`);
+            console.log(`🔄 Navigating to page ${currentPage + 1}: ${nextPageUrl}`);
 
-            // 모달 표시 count 설정
-            await chrome.storage.session.set({
-                test_show_modal: {
-                    count: 1,
-                    currentPage: currentPage + 1,
-                    totalPages: null
-                }
-            });
-            log('✅ Modal count set to 1');
+            // 모달 상태 설정 - StateManager 사용
+            await stateManager.showModal(currentPage + 1, null);
 
 
 
