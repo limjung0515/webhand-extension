@@ -198,22 +198,16 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             await navigator.waitForPageLoad(tabId);
             timer.start();
 
-            // chrome.tabs.sendMessage(tabId, {
-            //     type: 'SHOW_MODAL',
-            //     payload: { currentPage: currentPage + 1 }
-            // });
-
-            // return;
-            // // 즉시 모달 표시
-            // try {
-            //     await chrome.tabs.sendMessage(tabId, {
-            //         type: 'SHOW_MODAL',
-            //         payload: { currentPage: 1 }
-            //     });
-            //     console.log('✅ Modal shown immediately after navigation');
-            // } catch (error) {
-            //     console.error('❌ Failed to show modal:', error);
-            // }
+            // 즉시 모달 표시
+            try {
+                await chrome.tabs.sendMessage(tabId, {
+                    type: 'SHOW_MODAL',
+                    payload: { currentPage: currentPage + 1 }
+                });
+                console.log('✅ Modal shown for all-page mode');
+            } catch (error) {
+                console.error('❌ Failed to show modal:', error);
+            }
         } else {
             await chrome.tabs.sendMessage(tabId, {
                 type: 'SHOW_MODAL',
