@@ -5,6 +5,8 @@
 
 import type { ScrapeProgress } from '@/types/scraper';
 import type { UnifiedProgress } from '@/utils/scrape-helpers';
+import { OVERLAY_STYLES, MODAL_CONTAINER_STYLES, MODAL_ANIMATIONS } from './modal/ModalStyles';
+import { ModalAnimator } from './modal/ModalAnimator';
 
 export class ScrapeModal {
     private overlay: HTMLDivElement | null = null;
@@ -15,45 +17,14 @@ export class ScrapeModal {
     // private pollingInterval: number | null = null;
 
     /**
-     * 숫자 카운트업 애니메이션
+     * 숫자 카운트업 애니메이션 (ModalAnimator 사용)
      */
     private animateCount(targetCount: number, duration: number = 600) {
-        const startCount = this.currentCount;
-        const startTime = Date.now();
-
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // easing: 빠르게 시작, 천천히 끝 (ease-out cubic)
-            // const easedProgress = 1 - Math.pow(1 - progress, 3);
-
-            // ease-in-out (천천히 시작 → 빠르게 → 천천히 끝)
-            const easedProgress = progress < 0.5
-                ? 4 * progress * progress * progress
-                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-            this.currentCount = Math.floor(startCount + (targetCount - startCount) * easedProgress);
-
-            // DOM 업데이트 (올바른 selector 사용)
-            const itemsElement = this.modal?.querySelector('#webhand-items-collected');
-            if (itemsElement) {
-                itemsElement.textContent = `${this.currentCount}개`;
-            }
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                // 애니메이션 완료 시 정확한 값으로 설정
-                this.currentCount = targetCount;
-                const itemsElement = this.modal?.querySelector('#webhand-items-collected');
-                if (itemsElement) {
-                    itemsElement.textContent = `${targetCount}개`;
-                }
-            }
-        };
-
-        requestAnimationFrame(animate);
+        const itemsElement = this.modal?.querySelector('#webhand-items-collected');
+        if (itemsElement) {
+            ModalAnimator.animateCount(itemsElement as HTMLElement, this.currentCount, targetCount, duration);
+            this.currentCount = targetCount;
+        }
     }
 
 
@@ -67,21 +38,7 @@ export class ScrapeModal {
         // 전체 화면 블러 오버레이
         this.overlay = document.createElement('div');
         this.overlay.id = 'webhand-scrape-overlay';
-        this.overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            z-index: 999999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: auto;
-        `;
+        this.overlay.style.cssText = OVERLAY_STYLES;
 
         // 클릭 차단
         this.overlay.addEventListener('click', (e) => {
@@ -92,37 +49,11 @@ export class ScrapeModal {
         // 모달 생성
         this.modal = document.createElement('div');
         this.modal.id = 'webhand-scrape-modal';
-        this.modal.style.cssText = `
-            position: relative;
-            background: #2d2f33;
-            border: 1px solid #3a3b40;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-            min-width: 450px;
-            max-width: 500px;
-        `;
+        this.modal.style.cssText = MODAL_CONTAINER_STYLES;
 
         this.modal.innerHTML = `
             <style>
-                @keyframes webhand-modal-appear {
-                    from {
-                        opacity: 0;
-                        transform: scale(0.95) translateY(-10px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: scale(1) translateY(0);
-                    }
-                }
-                @keyframes webhand-progress-indeterminate {
-                    0% {
-                        left: -50%;
-                    }
-                    100% {
-                        left: 100%;
-                    }
-                }
+                ${MODAL_ANIMATIONS}
             </style>
             
             <!-- 상단 프로그레스 바 -->
