@@ -10,39 +10,8 @@ import { PageNavigator } from './services/PageNavigator';
 import { ResultManager } from './services/ResultManager';
 // 상태 관리 서비스
 import { ScrapingStateManager } from '../core/ScrapingStateManager';
-
-class DelayTimer {
-    private startTime: number = 0;
-    private targetDuration: number;
-
-    constructor(targetMs: number = 3000) {
-        this.targetDuration = targetMs;
-    }
-
-    // 시작 시 호출
-    start() {
-        this.startTime = Date.now();
-    }
-
-    restart() {
-        this.start();
-    }
-
-    // 종료 및 대기 (한 번에 처리)
-    async waitRemaining(): Promise<void> {
-        const elapsed = Date.now() - this.startTime;
-        const remaining = Math.max(0, this.targetDuration - elapsed);
-
-        if (remaining > 0) {
-            await new Promise(resolve => setTimeout(resolve, remaining));
-        }
-    }
-
-    // 경과 시간 확인 (디버깅용)
-    getElapsed(): number {
-        return Date.now() - this.startTime;
-    }
-}
+// 유틸리티
+import { DelayTimer } from '../utils/async/DelayTimer';
 
 console.log('🚀 WebHand Background Service Worker loaded');
 
@@ -188,11 +157,12 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
     const orchestrator = new ScrapingOrchestrator(3000);
     orchestrator.reset();  // 초기화
 
-    // Reset stop flag (기존 + 새로운 방식 병행)
-    await stateManager.startScraping(tabId, scraperId);  // 새로운 상태 관리
+    // Reset stop flag (StateManager 병행)
+    await stateManager.startScraping(tabId, scraperId);  // StateManager 초기화
 
-    // baseUrl을 정규화 (항상 pagenum=0로 설정 - 1페이지)
-    const normalizedUrl = normalizeStartUrl(baseUrl);
+    // PageNavigator 서비스
+    const navigator = new PageNavigator();
+    const normalizedUrl = navigator.normalizeStartUrl(baseUrl);
 
     console.log('🚀 Starting scraping on tab', tabId, 'mode:', mode);
     console.log('📍 Normalized URL:', normalizedUrl);
@@ -225,7 +195,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             await chrome.tabs.update(tabId, { url: normalizedUrl });
 
             // 페이지 로드 완료 대기
-            await waitForPageLoad(tabId);
+            await navigator.waitForPageLoad(tabId);
             timer.start();
 
             // chrome.tabs.sendMessage(tabId, {
@@ -351,7 +321,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
             // URL 기반으로 다음 페이지로 이동
             currentPage++;
-            const nextPageUrl = buildNextPageUrl(normalizedUrl, currentPage);
+            const nextPageUrl = navigator.buildNextPageUrl(normalizedUrl, currentPage);
 
             console.log(`🔄 Navigating to page ${currentPage + 1}: ${nextPageUrl}`);
 
@@ -362,7 +332,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
             await chrome.tabs.update(tabId, { url: nextPageUrl });
             // 페이지 로드 완료 대기 (필수!)
-            await waitForPageLoad(tabId);
+            await navigator.waitForPageLoad(tabId);
             timer.restart();
 
             // // 즉시 모달 표시
@@ -412,39 +382,6 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
         console.error('❌ All-page scrape failed:', error);
     }
 }
-
-// Normalize URL to start from page 1 (pagenum=0)
-function normalizeStartUrl(url: string): string {
-    const navigator = new PageNavigator();
-    return navigator.normalizeStartUrl(url);
-}
-
-// Build next page URL
-function buildNextPageUrl(baseUrl: string, pageNum: number): string {
-    const navigator = new PageNavigator();
-    return navigator.buildNextPageUrl(baseUrl, pageNum);
-}
-
-// Wait for page to fully load
-function waitForPageLoad(tabId: number): Promise<void> {
-    const navigator = new PageNavigator();
-    return navigator.waitForPageLoad(tabId);
-}
-
-// async function waitForContentScript(tabId: number): Promise<void> {
-//     for (let i = 0; i < 30; i++) { // 30번 시도
-//         try {
-//             await chrome.tabs.sendMessage(tabId, { type: 'PING' });
-//             return;
-//         } catch {
-//             if (i < 29) { // 마지막 시도가 아니면
-//                 await new Promise(r => setTimeout(r, 100));
-//             }
-//         }
-//     }
-//     // 최대 시간: 29 * 100ms = 2.9초
-//     throw new Error('Content Script not ready');
-// }
 
 // Timestamped console log utility
 function log(...args: any[]) {
