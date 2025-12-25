@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SUPPORTED_SITES, findAllScrapersForUrl, getSiteByUrl } from '@/scrapers/registry';
 import type { ScrapeResult } from '@/types/scraper';
+import { sendToTab, sendToBackground } from '../utils/messaging';
 
 type ScrapeMode = 'current' | 'all';
 
@@ -124,8 +125,8 @@ function App() {
                 }
 
                 // Content Script에 PING 보내기
-                await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
-                setContentScriptReady(true);
+                const { success } = await sendToTab(tab.id, { type: 'PING' });
+                setContentScriptReady(success);
             } catch (error) {
                 // 응답 없으면 Content Script 미로드
                 setContentScriptReady(false);
@@ -152,8 +153,8 @@ function App() {
                         // 페이지 로드 완료 → 즉시 PING 체크
                         (async () => {
                             try {
-                                await chrome.tabs.sendMessage(tabId, { type: 'PING' });
-                                setContentScriptReady(true);
+                                const { success } = await sendToTab(tabId, { type: 'PING' });
+                                setContentScriptReady(success);
                             } catch (error) {
                                 setContentScriptReady(false);
                             }
@@ -203,9 +204,9 @@ function App() {
 
     // 히스토리 아이템 클릭 - 결과 페이지 열기
     const handleHistoryItemClick = (item: HistoryItem) => {
-        chrome.runtime.sendMessage({
+        sendToBackground({
             type: 'OPEN_RESULT_PAGE',
-            payload: { resultId: item.id }
+            payload: { id: item.id }
         });
         setShowHistory(false);
     };
@@ -240,10 +241,9 @@ function App() {
             }
 
             // 통합된 메시지: 현재/전체 모두 Background로 전송
-            await chrome.runtime.sendMessage({
+            await sendToBackground({
                 type: 'START_SCRAPE',
                 payload: {
-                    tabId: tab.id,
                     scraperId: selectedScraperId,
                     mode: scrapeMode,  // 'current' or 'all'
                     baseUrl: tab.url
@@ -270,7 +270,7 @@ function App() {
             if (!tab.id) return;
 
             // Background로 중단 메시지 전송
-            await chrome.runtime.sendMessage({
+            await sendToBackground({
                 type: 'STOP_SCRAPE',
                 payload: { tabId: tab.id }
             });

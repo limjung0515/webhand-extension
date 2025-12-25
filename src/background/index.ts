@@ -12,6 +12,8 @@ import { ResultManager } from './services/ResultManager';
 import { ScrapingStateManager } from '../core/ScrapingStateManager';
 // 유틸리티
 import { DelayTimer } from '../utils/async/DelayTimer';
+// 메시징 유틸리티
+import { sendToTab, notifySidePanel } from '../utils/messaging';
 
 console.log('🚀 WebHand Background Service Worker loaded');
 
@@ -102,9 +104,7 @@ async function saveAndOpenResults(payload: {
     await resultManager.saveAndOpenResults(payload);
 
     // Side Panel에 완료 알림
-    chrome.runtime.sendMessage({
-        type: 'SCRAPE_COMPLETE'
-    }).catch(() => { });
+    notifySidePanel({ type: 'SCRAPE_COMPLETE' });
 }
 
 // Handle stop scrape
@@ -117,13 +117,7 @@ async function handleStopScrape(payload: { tabId: number }) {
     await stateManager.stopScraping();
 
     // Content Script에 모달 닫기 메시지 전송
-    try {
-        await chrome.tabs.sendMessage(tabId, {
-            type: 'HIDE_MODAL'
-        });
-    } catch (error) {
-        console.error('❌ Failed to send hide modal message:', error);
-    }
+    await sendToTab(tabId, { type: 'HIDE_MODAL' });
 }
 
 
@@ -178,11 +172,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
         // StateManager가 이미 startScraping()에서 상태를 초기화함
 
         // Content Script 전역 변수 리셋 메시지
-        try {
-            await chrome.tabs.sendMessage(tabId, { type: 'RESET_STATE' });
-        } catch {
-            // Content Script 없으면 무시
-        }
+        await sendToTab(tabId, { type: 'RESET_STATE' });
 
         console.log('✅ State initialized for new scraping session');
 
@@ -211,13 +201,9 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             console.log('✅ Modal storage set for page', currentPage + 1);
 
             // Content Script에게 storage 읽으라고 알림
-            // try {
-            //     await chrome.tabs.sendMessage(tabId, { type: 'CHECK_MODAL_STORAGE' });
-            // } catch (error) {
-            //     console.log('Content script will auto-check on load');
-            // }
+            await sendToTab(tabId, { type: 'CHECK_MODAL_STORAGE' });
         } else {
-            await chrome.tabs.sendMessage(tabId, { type: 'CHECK_MODAL_STORAGE' });
+            await sendToTab(tabId, { type: 'CHECK_MODAL_STORAGE' });
             timer.start();
         }
 
@@ -233,7 +219,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                 // 모달 닫기 및 storage 정리
                 try {
                     await chrome.storage.session.remove('test_show_modal');
-                    await chrome.tabs.sendMessage(tabId, { type: 'HIDE_MODAL' });
+                    await sendToTab(tabId, { type: 'HIDE_MODAL' });
                     console.log('✅ Modal hidden and storage cleaned on early stop');
                 } catch (error) {
                     console.warn('⚠️ Failed to cleanup on stop:', error);
@@ -244,9 +230,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                 console.log('✅ State manager reset');
 
                 // Side Panel에 완료 신호 (버튼 복구)
-                chrome.runtime.sendMessage({
-                    type: 'SCRAPE_COMPLETE'
-                }).catch(() => { });
+                notifySidePanel({ type: 'SCRAPE_COMPLETE' });
                 return;
             }
 
@@ -258,8 +242,8 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             // 재시도 로직
             while (retryCount < MAX_RETRIES) {
                 try {
-                    const response = await chrome.tabs.sendMessage(tabId, {
-                        type: 'START_SITE_SCRAPE',
+                    const { success, data: response } = await sendToTab(tabId, {
+                        type: 'SCRAPE_PAGE',
                         payload: {
                             scraperId: scraperId
                         }
@@ -268,7 +252,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                     console.log(response);
                     log('✅ Page', currentPage, 'completed');
 
-                    if (response.success && response.results && response.results.length > 0) {
+                    if (success && response && response.results && response.results.length > 0) {
                         pageResponse = response;
                         console.log(`✅ Page ${currentPage + 1}: ${response.results.length} items collected`);
 
@@ -291,14 +275,15 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                         // Storage에서 totalPages 가져오기 (전체 페이지 모드만!)
                         const storageData = await chrome.storage.session.get('test_show_modal');
                         const totalPages = mode === 'all' ? (storageData.test_show_modal?.totalPages || null) : null;
+                        const updateData = storageData.test_show_modal || {}; // Ensure updateData is defined
 
                         try {
-                            await chrome.tabs.sendMessage(tabId, {
+                            await sendToTab(tabId, {
                                 type: 'UPDATE_PROGRESS',
                                 payload: {
+                                    count: pageResponse.results.length + (updateData.previousCount || 0),
                                     currentPage: currentPage + 1,
-                                    itemsCollected: allResults.length,
-                                    totalPages: totalPages  // 전체 페이지 수 포함
+                                    totalPages: totalPages // Use totalPages from storageData
                                 }
                             });
                         } catch (error) {
@@ -327,7 +312,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                 // 모달 닫기 및 storage 정리
                 try {
                     await chrome.storage.session.remove('test_show_modal');
-                    await chrome.tabs.sendMessage(tabId, { type: 'HIDE_MODAL' });
+                    await sendToTab(tabId, { type: 'HIDE_MODAL' });
                     console.log('✅ Modal hidden and storage cleaned on stop');
                 } catch (error) {
                     console.warn('⚠️ Failed to cleanup on stop:', error);
@@ -338,9 +323,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                 console.log('✅ State manager reset');
 
                 // Side Panel에 완료 신호 (버튼 복구)
-                chrome.runtime.sendMessage({
-                    type: 'SCRAPE_COMPLETE'
-                }).catch(() => { });
+                notifySidePanel({ type: 'SCRAPE_COMPLETE' });
                 return;
             }
 
@@ -366,7 +349,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                 // 모달 닫기 및 storage 정리
                 try {
                     await chrome.storage.session.remove('test_show_modal');
-                    await chrome.tabs.sendMessage(tabId, { type: 'HIDE_MODAL' });
+                    await sendToTab(tabId, { type: 'HIDE_MODAL' });
                     console.log('✅ Modal hidden and storage cleaned on stop');
                 } catch (error) {
                     console.warn('⚠️ Failed to cleanup on stop:', error);
@@ -377,9 +360,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                 console.log('✅ State manager reset');
 
                 // Side Panel에 완료 신호 (버튼 복구)
-                chrome.runtime.sendMessage({
-                    type: 'SCRAPE_COMPLETE'
-                }).catch(() => { });
+                notifySidePanel({ type: 'SCRAPE_COMPLETE' });
                 return;
             }
 
@@ -419,7 +400,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
             // 추가 안전장치: 명시적으로 체크 요청
             try {
-                await chrome.tabs.sendMessage(tabId, { type: 'CHECK_MODAL_STORAGE' });
+                await sendToTab(tabId, { type: 'CHECK_MODAL_STORAGE' });
             } catch (error) {
                 console.log('Content script will auto-check on load');
             }
@@ -432,7 +413,7 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                 test_show_modal: { count: 0 }
             });
 
-            await chrome.tabs.sendMessage(tabId, { type: 'HIDE_MODAL' });
+            await sendToTab(tabId, { type: 'HIDE_MODAL' });
             console.log('✅ Modal hidden after scraping complete');
         } catch (error) {
             console.warn('⚠️ Failed to hide modal:', error);
