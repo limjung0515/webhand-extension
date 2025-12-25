@@ -13,7 +13,6 @@ function log(...args: any[]) {
     const now = new Date();
     const time = now.toTimeString().split(' ')[0]; // HH:MM:SS
     const ms = now.getMilliseconds().toString().padStart(3, '0');
-    console.log(`[${time}.${ms}]`, ...args);
 }
 
 /**
@@ -59,7 +58,6 @@ async function checkAndShowModalFromCount() {
             // });
         }
     } catch (error) {
-        console.log(error);
         // 에러 무시
     }
 }

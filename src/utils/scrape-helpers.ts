@@ -42,7 +42,6 @@ export async function saveScrapeResult(params: {
         [`scrape_result_${result.id}`]: result
     });
 
-    console.log(`✅ Saved scrape result: ${result.id} (${result.totalItems} items)`);
 
     return result.id;
 }

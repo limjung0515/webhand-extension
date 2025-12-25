@@ -55,7 +55,6 @@ export class ResultManager {
             [`scrape_result_${scrapeResult.id}`]: scrapeResult
         });
 
-        console.log(`🎉 Scraping complete! Total items: ${results.length}`);
 
         // 결과 페이지 열기
         await this.openResultPage(scrapeResult.id);
@@ -67,6 +66,5 @@ export class ResultManager {
     async openResultPage(resultId: string): Promise<void> {
         const resultUrl = chrome.runtime.getURL(`src/pages/results.html?id=${resultId}`);
         const tab = await chrome.tabs.create({ url: resultUrl });
-        console.log('✅ Result page opened:', tab.id);
     }
 }

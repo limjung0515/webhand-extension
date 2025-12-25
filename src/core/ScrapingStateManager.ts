@@ -112,7 +112,6 @@ export class ScrapingStateManager {
                     this.history.shift();
                 }
 
-                console.log('🔄 State updated:', changedKeys.join(', '), partial);
             }
 
             // 리스너들에게 통지
@@ -142,7 +141,6 @@ export class ScrapingStateManager {
      */
     clearHistory(): void {
         this.history = [];
-        console.log('🗑️ State history cleared');
     }
 
     /**

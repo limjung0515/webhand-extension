@@ -226,35 +226,28 @@ export class DomemeScraper {
      */
     getTotalPages(): number | null {
         try {
-            console.log('🔍 [getTotalPages] Starting total pages extraction...');
 
             // "이동" 버튼 찾기 (onclick="pageGos();" 속성 있는 a 태그)
             const moveButtons = Array.from(document.querySelectorAll('a[onclick*="pageGos"]'));
-            console.log(`🔍 [getTotalPages] Found ${moveButtons.length} move buttons`);
 
             for (const button of moveButtons) {
-                console.log('🔍 [getTotalPages] Checking button:', button.textContent?.trim());
 
                 // 버튼 다음 노드들에서 텍스트 찾기
                 let nextNode = button.nextSibling;
                 let attempts = 0;
 
                 while (nextNode && attempts < 5) { // 최대 5개 노드까지 탐색
-                    console.log(`🔍 [getTotalPages] Checking nextSibling (attempt ${attempts + 1}):`, nextNode.nodeType, nextNode.textContent?.substring(0, 50));
 
                     if (nextNode.nodeType === Node.TEXT_NODE) {
                         const text = nextNode.textContent?.trim() || '';
-                        console.log(`🔍 [getTotalPages] Text node found: "${text}"`);
 
                         // "총 13 페이지" 또는 "총 1,773 페이지" 패턴 매칭
                         const match = text.match(/총\s*([\d,]+)\s*페이지/);
                         if (match) {
                             // 콤마 제거하고 숫자로 변환
                             const totalPages = parseInt(match[1].replace(/,/g, ''), 10);
-                            console.log(`✅ [getTotalPages] SUCCESS! Found total pages: ${totalPages} from text: "${text}"`);
                             return totalPages;
                         } else {
-                            console.log(`⚠️ [getTotalPages] No match in text: "${text}"`);
                         }
                     }
                     nextNode = nextNode.nextSibling;

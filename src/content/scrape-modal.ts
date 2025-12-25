@@ -284,18 +284,15 @@ export class ScrapeModal {
 
         // 페이지 진행률
         if (pageProgress) {
-            console.log('📋 [Modal] Page progress update:', { mode: progress.mode, currentPage: progress.currentPage, totalPages: progress.totalPages });
 
             if (progress.mode === 'multi' && progress.totalPages) {
                 // 전체 페이지: "1 / 7 페이지"
                 const displayText = `${progress.currentPage} / ${progress.totalPages} 페이지`;
-                console.log('📋 [Modal] Setting multi-page text:', displayText);
                 pageProgress.textContent = displayText;
             } else {
                 // 현재 페이지: URL에서 실제 페이지 번호 추출
                 const currentPageFromUrl = this.getCurrentPageFromUrl();
                 const displayText = `${currentPageFromUrl} 페이지`;
-                console.log('📋 [Modal] Setting single-page text:', displayText);
                 pageProgress.textContent = displayText;
             }
         }

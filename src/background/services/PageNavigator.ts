@@ -40,7 +40,6 @@ export class PageNavigator {
             const listener = (updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
                 if (updatedTabId === tabId && changeInfo.status === 'complete') {
                     cleanup();
-                    console.log('✅ Page loaded (status: complete)');
                     resolve();
                 }
             };

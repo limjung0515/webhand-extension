@@ -441,7 +441,6 @@ export function endTrace(trace: TraceInfo, success: boolean, error?: any): void 
 
     if (success) {
         globalMetrics.recordSent(messageType, latency);
-        console.log(output);
     } else {
         globalMetrics.recordFailed(messageType);
         console.error(output);

@@ -54,7 +54,6 @@ export class ScrapingOrchestrator {
         while (retryCount < maxRetries) {
             // 중단 확인
             if (this.shouldStop) {
-                console.log('🛑 Scraping stopped by user');
                 return { success: false };
             }
 
@@ -67,11 +66,9 @@ export class ScrapingOrchestrator {
                     }
                 });
 
-                console.log("response", response);
 
                 if (response.success && response.results && response.results.length > 0) {
                     pageResponse = response;
-                    console.log(`✅ Page ${currentPage + 1}: ${response.results.length} items collected`);
                     break;
                 } else {
                     console.warn(`⚠️ Page ${currentPage + 1}: Empty or invalid response, retrying... (${retryCount + 1}/${maxRetries})`);

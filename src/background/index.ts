@@ -426,5 +426,4 @@ function log(...args: any[]) {
     const now = new Date();
     const time = now.toTimeString().split(' ')[0]; // HH:MM:SS
     const ms = now.getMilliseconds().toString().padStart(3, '0');
-    console.log(`[${time}.${ms}]`, ...args);
 }
