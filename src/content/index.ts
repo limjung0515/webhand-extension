@@ -7,7 +7,6 @@ import { DomemeScraper } from '@/scrapers/domeme';
 import { ScrapeModal } from './scrape-modal';
 import { MessageType } from '@/types/messages';
 
-console.log('🌐 WebHand Content Script loaded on:', window.location.href);
 
 // Timestamped console log utility
 function log(...args: any[]) {
@@ -74,12 +73,10 @@ chrome.runtime.onMessage.addListener((
     _sender,
     sendResponse
 ) => {
-    console.log('📨 Message received in content script:', message.type);
 
     switch (message.type) {
         case MessageType.START_SITE_SCRAPE:
         case 'SCRAPE_PAGE':  // New message type from migrated background
-            console.log('#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#')
             // 동기 실행
             try {
                 const result = executeScraping(message.payload.scraperId);
@@ -130,12 +127,10 @@ chrome.runtime.onMessage.addListener((
 
         case 'HIDE_MODAL':
             // Background에서 중단 메시지 받음
-            console.log('⛔ Hide modal requested from Background');
             isStoppedByUser = true;
 
             // 모달 즉시 닫기
             if (activeModal) {
-                console.log('🔴 [MODAL HIDE] Via HIDE_MODAL message');
                 activeModal.hide();
             }
             activeModal = null;
@@ -149,7 +144,6 @@ chrome.runtime.onMessage.addListener((
 
         case 'RESET_STATE':
             // Background에서 상태 리셋 요청 (새 스크래핑 세션 시작 시)
-            console.log('🔄 Resetting Content Script local state');
             activeModal = null;
             isStoppedByUser = false;
             sendResponse({ success: true });
@@ -157,7 +151,6 @@ chrome.runtime.onMessage.addListener((
 
         case 'ENSURE_SCROLL_ENABLED':
             // 스크롤 복원 안전장치
-            console.log('🔄 Ensuring scroll is enabled');
             document.body.style.overflow = '';
             document.body.style.pointerEvents = '';
             sendResponse({ success: true });
@@ -172,7 +165,6 @@ chrome.runtime.onMessage.addListener((
 
 // Unified scraping function
 function executeScraping(scraperId: string): any {
-    console.log(`🎯 Starting scraping: ${scraperId}`);
 
     if (scraperId === 'domeme-products') {
         const scraper = new DomemeScraper();
@@ -181,37 +173,26 @@ function executeScraping(scraperId: string): any {
         try {
             // 전체 페이지 수 추출 (전체 모드에서만 사용)
             const totalPages = scraper.getTotalPages();
-            console.log('📊 Total pages detected:', totalPages);
 
             // 모달이 없으면 새로 생성 (현재 페이지 모드)
             // if (!modal) {
-            //     console.log('🟢 [DEBUG] Creating modal...');
             //     isStoppedByUser = false;
             //     modal = new ScrapeModal();
             //     activeModal = modal;
-            //     console.log('🟢 [DEBUG] Modal created, calling show()...');
             //     modal.show();
-            //     console.log('🟢 [DEBUG] Modal show() called');
             // } else {
-            //     console.log('🟢 [DEBUG] Using existing modal');
             // }
 
             // 스크래핑 실행
-            console.log('🟢 [DEBUG] Starting scraping...');
             const results = scraper.scrapeCurrentPage();
-            console.log('🟢 [DEBUG] Scraping complete, results:', results.length);
 
             // 중단 확인
             if (isStoppedByUser) {
-                console.log('⛔ Scraping stopped by user');
-                console.log('🔴 [MODAL HIDE] executeScraping - stopped during scraping');
                 modal?.hide();
                 activeModal = null;
                 return { success: false, message: 'Stopped by user' };
             }
 
-            console.log('modal');
-            console.log(modal);
 
             // 진행상황 표시는 background script의 UPDATE_PROGRESS에서만 처리
             // executeScraping은 단순히 현재 페이지 스크래핑만 담당
@@ -220,8 +201,6 @@ function executeScraping(scraperId: string): any {
             // 결과 + 다음 페이지 정보 반환
             const nextButton = scraper.findNextButton();
             const hasNextPage = nextButton !== null;
-            console.log('🔍 Next button:', nextButton?.getAttribute('href'));
-            console.log('📋 hasNextPage:', hasNextPage);
 
             return {
                 success: true,
@@ -262,7 +241,6 @@ function injectOpenButton() {
     try {
         // Check if button already exists
         if (document.getElementById('webhand-open-panel')) {
-            console.log('✅ WebHand button already exists');
             return;
         }
 
@@ -299,7 +277,6 @@ function injectOpenButton() {
         });
 
         document.body.appendChild(button);
-        console.log('✅ WebHand button injected successfully');
     } catch (error) {
         console.error('❌ Failed to inject button:', error);
     }
@@ -308,10 +285,8 @@ function injectOpenButton() {
 // Initialize with multiple safety checks
 function initialize() {
     if (document.readyState === 'loading') {
-        console.log('⏳ Document still loading, waiting for DOMContentLoaded...');
         document.addEventListener('DOMContentLoaded', injectOpenButton);
     } else {
-        console.log('✅ Document ready, injecting button...');
         injectOpenButton();
     }
 }
