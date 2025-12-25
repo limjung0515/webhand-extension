@@ -78,6 +78,7 @@ chrome.runtime.onMessage.addListener((
 
     switch (message.type) {
         case MessageType.START_SITE_SCRAPE:
+        case 'SCRAPE_PAGE':  // New message type from migrated background
             console.log('#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#@#')
             // 동기 실행
             try {
