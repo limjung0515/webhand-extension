@@ -115,7 +115,7 @@ chrome.runtime.onMessage.addListener((
                     status: 'scraping',
                     currentPage: message.payload.currentPage,
                     totalPages: message.payload.totalPages || null,  // payload에서 받아옴 (전체 페이지 모드만)
-                    itemsCollected: message.payload.itemsCollected,
+                    itemsCollected: message.payload.count || 0,  // count를 itemsCollected로 매핑
                     // message: `${message.payload.itemsCollected}개 수집 완료`
                     message: `잠시만요, 완료되면 결과를 보여드릴게요`
                 });
