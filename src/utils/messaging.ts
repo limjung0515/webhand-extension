@@ -670,6 +670,12 @@ export async function sendToTab<T = any>(
     message: any,
     options?: MessagingOptions
 ): Promise<{ success: boolean; data?: T; trace?: TraceInfo }> {
+    // Validate tabId
+    if (tabId === undefined || tabId === null || typeof tabId !== 'number') {
+        console.error(`❌ Invalid tabId: ${tabId}`);
+        return { success: false };
+    }
+
     // Validation
     if (options?.validate) {
         const validation = validateMessage(message, options.validate);
