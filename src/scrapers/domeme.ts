@@ -45,7 +45,7 @@ export class DomemeScraper {
     private extractProductData(card: HTMLElement): ProductItem | null {
         const nameEl = card.querySelector('.itemName');
         const idEl = card.querySelector('.txt8');
-        const imageEl = card.querySelector('img');
+        const imageEl = card.querySelector('.bane_brd1 img');  // 실제 상품 이미지 선택
         const linkEl = card.querySelector('a[href*="supplyView"]');
 
         if (!nameEl) return null;
@@ -60,17 +60,67 @@ export class DomemeScraper {
         const shippingMatch = text.match(/(선결제|착불|무료)\s*([\d,]*)\s*원?/);
         const shipping = shippingMatch ? shippingMatch[0] : '';
 
-        // 판매자 추출
+        // 판매자 이름 추출 및 "바로가기" 제거
         const sellerEl = card.querySelector('.main_cont_text3');
-        const seller = sellerEl?.textContent?.trim() || '';
+        let seller = sellerEl?.textContent?.trim() || '';
+        seller = seller.replace(/바로가기/g, '').trim();
+
+        // 판매자 ID 추출 (div style="color:#aaa" 안의 괄호 안 텍스트)
+        let sellerId = '';
+        const sellerIdDivs = card.querySelectorAll('div[style*="color:#aaa"]');
+        for (const div of sellerIdDivs) {
+            const text = div.textContent?.trim() || '';
+            // (kim01084101031) 형식에서 괄호 제거
+            const match = text.match(/\(([^)]+)\)/);
+            if (match) {
+                sellerId = match[1];
+                break;
+            }
+        }
+
+        // 판매자 등급 추출 (<strong>1</strong>등급)
+        let sellerGrade = '';
+        const gradeMatch = text.match(/<strong>(\d+)<\/strong>등급|(\d+)등급/);
+        if (gradeMatch) {
+            sellerGrade = (gradeMatch[1] || gradeMatch[2]) + '등급';
+        }
+
+        // 판매 타입 추출 (사업자전용 등)
+        let sellType = '';
+        const sellTypeEl = card.querySelector('.priceLg strong');
+        if (sellTypeEl) {
+            sellType = sellTypeEl.textContent?.trim() || '';
+        }
+
+        // 국내/해외 태그 추출
+        let tag = '';
+        const tagEl = card.querySelector('.main_cont_bu1');
+        if (tagEl) {
+            const tagText = tagEl.textContent?.trim();
+            if (tagText === '국내' || tagText === '해외') {
+                tag = tagText;
+            }
+        }
+
+        // 상품명에 태그 추가 및 "바로가기" 텍스트 제거
+        let productName = nameEl.textContent?.trim() || '';
+        // "바로가기" 제거
+        productName = productName.replace(/바로가기/g, '').trim();
+        if (tag) {
+            productName = `[${tag}] ${productName}`;
+        }
 
         return {
-            name: nameEl.textContent?.trim() || '',
+            name: productName,
             productId: idEl?.textContent?.trim() || '',
             price,
             shipping,
             seller,
-            imageUrl: imageEl?.src || '',
+            sellerId,
+            sellerGrade,
+            sellType,
+            tag,
+            imageUrl: (imageEl as HTMLImageElement)?.src || '',
             productUrl: linkEl ? window.location.origin + (linkEl as HTMLAnchorElement).getAttribute('href') : ''
         };
     }
@@ -168,6 +218,54 @@ export class DomemeScraper {
         }
 
         return null;
+    }
+
+    /**
+     * 전체 페이지 수 추출
+     * "이동" 버튼 다음의 "총 13 페이지" 또는 "총 1,773 페이지" 텍스트에서 파싱
+     */
+    getTotalPages(): number | null {
+        try {
+            console.log('🔍 [getTotalPages] Starting total pages extraction...');
+
+            // "이동" 버튼 찾기 (onclick="pageGos();" 속성 있는 a 태그)
+            const moveButtons = Array.from(document.querySelectorAll('a[onclick*="pageGos"]'));
+            console.log(`🔍 [getTotalPages] Found ${moveButtons.length} move buttons`);
+
+            for (const button of moveButtons) {
+                console.log('🔍 [getTotalPages] Checking button:', button.textContent?.trim());
+
+                // 버튼 다음 노드들에서 텍스트 찾기
+                let nextNode = button.nextSibling;
+                let attempts = 0;
+
+                while (nextNode && attempts < 5) { // 최대 5개 노드까지 탐색
+                    console.log(`🔍 [getTotalPages] Checking nextSibling (attempt ${attempts + 1}):`, nextNode.nodeType, nextNode.textContent?.substring(0, 50));
+
+                    if (nextNode.nodeType === Node.TEXT_NODE) {
+                        const text = nextNode.textContent?.trim() || '';
+                        console.log(`🔍 [getTotalPages] Text node found: "${text}"`);
+
+                        // "총 13 페이지" 또는 "총 1,773 페이지" 패턴 매칭
+                        const match = text.match(/총\s*([\d,]+)\s*페이지/);
+                        if (match) {
+                            // 콤마 제거하고 숫자로 변환
+                            const totalPages = parseInt(match[1].replace(/,/g, ''), 10);
+                            console.log(`✅ [getTotalPages] SUCCESS! Found total pages: ${totalPages} from text: "${text}"`);
+                            return totalPages;
+                        } else {
+                            console.log(`⚠️ [getTotalPages] No match in text: "${text}"`);
+                        }
+                    }
+                    nextNode = nextNode.nextSibling;
+                    attempts++;
+                }
+            }
+
+            return 1;  // 페이지 정보가 없으면 1페이지로 가정
+        } catch (error) {
+            return 1;  // 에러 발생 시에도 1페이지로 가정
+        }
     }
 
     /**

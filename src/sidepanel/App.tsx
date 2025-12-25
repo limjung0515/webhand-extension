@@ -20,6 +20,7 @@ function App() {
     const [showHistory, setShowHistory] = useState(false);
     const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
     const [contentScriptReady, setContentScriptReady] = useState(false);
+    const [currentResultId, setCurrentResultId] = useState<string | null>(null);  // 현재 보고 있는 결과 ID
 
     // 현재 URL에 맞는 스크래퍼들
     const availableScrapers = findAllScrapersForUrl(currentUrl);
@@ -61,7 +62,7 @@ function App() {
         });
     };
 
-    // 초기 로드 시 + 탭/페이지 변경 감지
+    // 초기 로드 시 + 탭/페이지 변경 감지 + results 페이지 감지
     useEffect(() => {
         updateCurrentTab();
 
@@ -89,6 +90,28 @@ function App() {
             chrome.windows.onFocusChanged.removeListener(handleWindowFocusChanged);
         };
     }, []);
+
+    // results 페이지 감지하여 자동으로 히스토리 모달 열기/닫기
+    useEffect(() => {
+        const isResultsPage = currentUrl.includes('/src/pages/results.html?id=');
+
+        if (isResultsPage) {
+            // 결과 페이지 → 모달 열기
+            const url = new URL(currentUrl);
+            const resultId = url.searchParams.get('id');
+            if (resultId) {
+                setCurrentResultId(resultId);
+                loadHistory();
+                setShowHistory(true);
+            }
+        } else {
+            // 일반 페이지 → 모달 닫기 (결과 페이지에서 전환된 경우만)
+            if (showHistory) {
+                setShowHistory(false);
+            }
+            setCurrentResultId(null);
+        }
+    }, [currentUrl]);
 
     // Content Script 로드 상태 확인 (Ping-Pong)
     useEffect(() => {
@@ -441,7 +464,7 @@ function App() {
                                 historyItems.map(item => (
                                     <div
                                         key={item.id}
-                                        className="history-item"
+                                        className={`history-item ${currentResultId === item.id ? 'current-result' : ''}`}
                                         onClick={() => handleHistoryItemClick(item)}
                                     >
                                         <div className="history-item-header">

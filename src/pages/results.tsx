@@ -41,15 +41,17 @@ function ResultsPage() {
     function downloadCSV() {
         if (!result) return;
 
-        const headers = ['번호', '상품명', '가격', '배송비', '판매자', '상품번호', '상품 URL'];
+        const headers = ['번호', '이미지', '상품명', '가격', '배송비', '판매자', '판매자 ID', '판매자 등급', '상품번호'];
         const rows = result.items.map((item, index) => [
             index + 1,
+            item.imageUrl,
             item.name,
             item.price,
             item.shipping,
             item.seller,
-            item.productId,
-            item.productUrl
+            item.sellerId || '',
+            item.sellerGrade || '',
+            item.productId
         ]);
 
         const csv = [
@@ -115,9 +117,10 @@ function ResultsPage() {
                             <th>상품명</th>
                             <th>가격</th>
                             <th>배송비</th>
-                            <th>판매자</th>
+                            <th>판매 정보</th>
+                            <th>판매자 ID</th>
+                            <th>판매자 등급</th>
                             <th>상품번호</th>
-                            <th>링크</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -132,18 +135,29 @@ function ResultsPage() {
                                             <div className="no-image">No Image</div>
                                         )}
                                 </td>
-                                <td className="td-name">{item.name}</td>
+                                <td className="td-name">
+                                    <a
+                                        href={`https://domeme.domeggook.com/s/${item.productId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="product-link"
+                                    >
+                                        {item.name}
+                                    </a>
+                                </td>
                                 <td className="td-price">{item.price}</td>
                                 <td className="td-shipping">{item.shipping}</td>
-                                <td className="td-seller">{item.seller}</td>
-                                <td className="td-id">{item.productId}</td>
-                                <td className="td-link">
-                                    {item.productUrl && (
-                                        <a href={item.productUrl} target="_blank" rel="noopener noreferrer">
-                                            🔗 상세보기
-                                        </a>
+                                <td className="td-seller">
+                                    {item.seller}
+                                    {item.sellType && (
+                                        <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                                            {item.sellType}
+                                        </div>
                                     )}
                                 </td>
+                                <td className="td-seller-id">{item.sellerId || '-'}</td>
+                                <td className="td-seller-grade">{item.sellerGrade || '-'}</td>
+                                <td className="td-id">{item.productId}</td>
                             </tr>
                         ))}
                     </tbody>

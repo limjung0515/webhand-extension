@@ -19,6 +19,8 @@ export const OVERLAY_STYLES = `
     pointer-events: auto;
 `;
 
+
+
 export const MODAL_CONTAINER_STYLES = `
     position: relative;
     background: #2d2f33;

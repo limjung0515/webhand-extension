@@ -32,6 +32,10 @@ export interface ProductItem {
     price: string;
     shipping: string;
     seller: string;
+    sellerId?: string;        // 판매자 ID
+    sellerGrade?: string;     // 판매자 등급
+    sellType?: string;        // 판매 타입 (사업자전용 등)
+    tag?: string;             // 국내/해외 태그
     imageUrl: string;
     productUrl: string;
 }

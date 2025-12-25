@@ -14,12 +14,13 @@ export class ScrapeModal {
     private progressBar: HTMLDivElement | null = null;
     private scrollAnimationId: number | null = null;
     private currentCount: number = 0; // 현재 표시 중인 숫자 (애니메이션용)
+
     // private pollingInterval: number | null = null;
 
     /**
      * 숫자 카운트업 애니메이션 (ModalAnimator 사용)
      */
-    private animateCount(targetCount: number, duration: number = 600) {
+    private animateCount(targetCount: number, duration: number = 1500) {
         const itemsElement = this.modal?.querySelector('#webhand-items-collected');
         if (itemsElement) {
             ModalAnimator.animateCount(itemsElement as HTMLElement, this.currentCount, targetCount, duration);
@@ -32,9 +33,6 @@ export class ScrapeModal {
      * 모달 표시
      */
     show() {
-        // 페이지 최상단으로 스크롤
-        window.scrollTo({ top: 0, behavior: 'instant' });
-
         // 전체 화면 블러 오버레이
         this.overlay = document.createElement('div');
         this.overlay.id = 'webhand-scrape-overlay';
@@ -56,25 +54,7 @@ export class ScrapeModal {
                 ${MODAL_ANIMATIONS}
             </style>
             
-            <!-- 상단 프로그레스 바 -->
-            <div style="
-                position: relative;
-                height: 4px;
-                background: #e0e0e0;
-                overflow: hidden;
-            ">
-                <div id="webhand-top-progress-bar" style="
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    height: 100%;
-                    width: 0%;
-                    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-                    transition: width 2s linear;
-                "></div>
-            </div>
-            
-            <!-- 모달 내용 -->
+            <!-- 모달 내용 -->ㄱ
             <div style="padding: 32px 24px;">
                 <div style="text-align: center; margin-bottom: 24px;">
                     <div style="
@@ -121,7 +101,7 @@ export class ScrapeModal {
                             <div style="
                                 font-size: 12px;
                                 color: #9ca3af;
-                            ">진행률</div>
+                            ">진행중</div>
                             <div id="webhand-page-progress" style="
                                 font-size: 18px;
                                 font-weight: 600;
@@ -146,9 +126,9 @@ export class ScrapeModal {
                         </div>
                     </div>
                     
-                    <!-- 진행률 바 (전체 페이지 모드만) -->
+                    <!-- 진행률 바 (스크롤 애니메이션용) -->
                     <div id="webhand-progress-bar-container" style="
-                        display: none;
+                        display: block;
                         margin-top: 16px;
                     ">
                         <div style="
@@ -162,7 +142,7 @@ export class ScrapeModal {
                                 height: 100%;
                                 width: 0%;
                                 background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
-                                transition: width 0.3s ease;
+                                transition: width 1.5s ease;
                                 border-radius: 3px;
                             "></div>
                         </div>
@@ -216,11 +196,8 @@ export class ScrapeModal {
         document.body.style.overflow = 'hidden';
         document.body.style.pointerEvents = 'none';
 
-        // 프로그레스 바 참조 저장
-        this.progressBar = this.modal.querySelector('#webhand-top-progress-bar');
-
-        // 스크래핑 중단 플래그 폴링 시작
-        // this.startPolling();
+        // 프로그레스 바 참조 저장 (가운데 보라색 바를 진행률 표시용으로 사용)
+        this.progressBar = this.modal.querySelector('#webhand-progress-bar-fill');
 
         // NOTE: 프로그레스바와 스크롤은 updateUnifiedProgress()에서 시작
     }
@@ -277,15 +254,17 @@ export class ScrapeModal {
     updateUnifiedProgress(progress: UnifiedProgress) {
         if (!this.modal) return;
 
+        // ✅ 최상단으로 스크롤 (스크롤 다운 애니메이션 시작 전)
+        if (this.progressBar && this.progressBar.style.width === '0%') {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+
         const statsContainer = this.modal.querySelector('#webhand-progress-stats') as HTMLDivElement;
         const pageProgress = this.modal.querySelector('#webhand-page-progress') as HTMLDivElement;
-        const itemsCollected = this.modal.querySelector('#webhand-items-collected') as HTMLDivElement;
-        const progressBarContainer = this.modal.querySelector('#webhand-progress-bar-container') as HTMLDivElement;
-        const progressBarFill = this.modal.querySelector('#webhand-progress-bar-fill') as HTMLDivElement;
         const statusMessage = this.modal.querySelector('#webhand-status-message') as HTMLDivElement;
         const subtitle = this.modal.querySelector('#webhand-modal-subtitle') as HTMLElement;
 
-        // 첫 업데이트 시 프로그레스바와 스크롤 시작
+        // ✅ 첫 업데이트 시 프로그레스바와 스크롤 시작
         if (this.progressBar && this.progressBar.style.width === '0%') {
             // 프로그레스바를 2초에 걸쳐 100%로 채우기
             setTimeout(() => {
@@ -305,25 +284,28 @@ export class ScrapeModal {
 
         // 페이지 진행률
         if (pageProgress) {
+            console.log('📋 [Modal] Page progress update:', { mode: progress.mode, currentPage: progress.currentPage, totalPages: progress.totalPages });
+
             if (progress.mode === 'multi' && progress.totalPages) {
-                pageProgress.textContent = `${progress.currentPage}/${progress.totalPages} 페이지`;
+                // 전체 페이지: "1 / 7 페이지"
+                const displayText = `${progress.currentPage} / ${progress.totalPages} 페이지`;
+                console.log('📋 [Modal] Setting multi-page text:', displayText);
+                pageProgress.textContent = displayText;
             } else {
-                pageProgress.textContent = `${progress.currentPage} 페이지`;
+                // 현재 페이지: URL에서 실제 페이지 번호 추출
+                const currentPageFromUrl = this.getCurrentPageFromUrl();
+                const displayText = `${currentPageFromUrl} 페이지`;
+                console.log('📋 [Modal] Setting single-page text:', displayText);
+                pageProgress.textContent = displayText;
             }
         }
 
         // 수집 아이템 (애니메이션 적용)
-        if (itemsCollected) {
-            // 애니메이션으로 숫자 변경
-            this.animateCount(progress.itemsCollected - 1, 2000);
-        }
+        // UX 개선: 실제보다 1-2개 적게 표시해서 화면 전환이 자연스럽게 느껴지도록
+        const displayCount = Math.max(0, progress.itemsCollected - Math.floor(Math.random() * 2));
+        this.animateCount(displayCount, 1500);
 
-        // 진행률 바 (전체 페이지 모드만)
-        if (progress.mode === 'multi' && progress.totalPages && progressBarContainer && progressBarFill) {
-            progressBarContainer.style.display = 'block';
-            const percentage = (progress.currentPage / progress.totalPages) * 100;
-            progressBarFill.style.width = `${percentage}%`;
-        }
+        // (프로그레스 바는 첫 업데이트 시 위에서 100%로 채워짐)
 
         // 상태 메시지
         if (statusMessage && progress.message) {
@@ -342,9 +324,26 @@ export class ScrapeModal {
                 subtitle.textContent = '오류가 발생했습니다';
                 subtitle.style.color = '#ef4444';
             } else {
-                subtitle.textContent = progress.mode === 'multi' ? '전체 페이지 스크래핑 중...' : '데이터를 수집하고 있습니다';
+                subtitle.textContent = '데이터를 수집하고 있습니다';
             }
         }
+    }
+
+    /**
+     * URL에서 현재 페이지 번호 추출
+     * 예: ?pagenum=0 → 1페이지, ?pagenum=1 → 2페이지
+     */
+    private getCurrentPageFromUrl(): number {
+        try {
+            const url = new URL(window.location.href);
+            const pagenum = url.searchParams.get('pagenum');
+            if (pagenum !== null) {
+                return parseInt(pagenum, 10) + 1; // pagenum=0이 1페이지
+            }
+        } catch (error) {
+            console.warn('Failed to extract page number from URL:', error);
+        }
+        return 1; // 기본값
     }
 
     /**

@@ -45,14 +45,20 @@ export class ModalAnimator {
     /**
      * 페이지 최하단으로 부드럽게 스크롤
      * @param duration 스크롤 기간 (ms)
-     * @returns 취소 가능한 ID
+     * @returns animation frame ID
      */
-    static smoothScrollToBottom(duration: number = 1000): number {
-        const start = window.scrollY;
-        const target = document.documentElement.scrollHeight - window.innerHeight;
-        const distance = target - start;
-        const startTime = Date.now();
+    static smoothScrollToBottom(duration: number = 1500): number {
+        const start = window.pageYOffset;
+        const end = Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight
+        ) - window.innerHeight;
+        const distance = end - start;
 
+        // 이미 하단이면 스킵
+        if (distance <= 0) return -1;
+
+        const startTime = performance.now();
         let animationId: number;
 
         const scroll = (currentTime: number) => {
@@ -74,4 +80,39 @@ export class ModalAnimator {
         animationId = requestAnimationFrame(scroll);
         return animationId;
     }
+
+    // private scrollToBottom() {
+    //     const duration = 1500; // 1.5초 (더 천천히)
+    //     const start = window.pageYOffset;
+    //     const end = Math.max(
+    //         document.body.scrollHeight,
+    //         document.documentElement.scrollHeight
+    //     ) - window.innerHeight;
+    //     const distance = end - start;
+
+    //     if (distance <= 0) return; // 이미 하단이면 스킵
+
+    //     const startTime = performance.now();
+
+    //     const scroll = (currentTime: number) => {
+    //         const elapsed = currentTime - startTime;
+    //         const progress = Math.min(elapsed / duration, 1);
+
+    //         // Easing function (ease-in-out)
+    //         const easeProgress = progress < 0.5
+    //             ? 2 * progress * progress
+    //             : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+    //         window.scrollTo(0, start + distance * easeProgress);
+
+    //         if (progress < 1) {
+    //             this.scrollAnimationId = requestAnimationFrame(scroll);
+    //         } else {
+    //             this.scrollAnimationId = null;
+    //         }
+    //     };
+
+    //     this.scrollAnimationId = requestAnimationFrame(scroll);
+    // }
+
 }

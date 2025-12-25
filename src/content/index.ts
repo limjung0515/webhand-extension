@@ -41,8 +41,15 @@ async function checkAndShowModalFromCount() {
             // 그 다음 모달 표시
             const modal = new ScrapeModal();
             activeModal = modal;
+
+            // 누적 카운트를 위해 previousCount로 초기화
+            const previousCount = result.test_show_modal.previousCount || 0;
+            log('🔢 Initializing currentCount from previousCount:', previousCount);
+            (modal as any).currentCount = previousCount;
+
             modal.show();
 
+            // // 진행 상황 초기화 표시
             // modal.updateUnifiedProgress({
             //     mode: 'multi',
             //     status: 'scraping',
@@ -92,6 +99,29 @@ chrome.runtime.onMessage.addListener((
             sendResponse({ success: true });
             return false; // 동기 응답
 
+        case 'CHECK_MODAL_STORAGE':
+            // Storage를 확인하고 모달 표시
+            log('🔍 [CHECK_MODAL_STORAGE] Checking storage...');
+            checkAndShowModalFromCount();
+            sendResponse({ success: true });
+            return false;
+
+        case 'UPDATE_PROGRESS':
+            // 진행 상황 업데이트
+            if (activeModal && message.payload) {
+                activeModal.updateUnifiedProgress({
+                    mode: 'multi',
+                    status: 'scraping',
+                    currentPage: message.payload.currentPage,
+                    totalPages: message.payload.totalPages || null,  // payload에서 받아옴 (전체 페이지 모드만)
+                    itemsCollected: message.payload.itemsCollected,
+                    // message: `${message.payload.itemsCollected}개 수집 완료`
+                    message: `잠시만요, 완료되면 결과를 보여드릴게요`
+                });
+            }
+            sendResponse({ success: true });
+            return false;
+
         case 'PING':
             // Side Panel에서 Content Script 로드 상태 확인용
             sendResponse({ ready: true });
@@ -124,6 +154,14 @@ chrome.runtime.onMessage.addListener((
             sendResponse({ success: true });
             return false;
 
+        case 'ENSURE_SCROLL_ENABLED':
+            // 스크롤 복원 안전장치
+            console.log('🔄 Ensuring scroll is enabled');
+            document.body.style.overflow = '';
+            document.body.style.pointerEvents = '';
+            sendResponse({ success: true });
+            return false;
+
         default:
             console.warn('⚠️ Unknown message type:', message.type);
     }
@@ -140,6 +178,10 @@ function executeScraping(scraperId: string): any {
         let modal: any = activeModal; // 기존 모달 사용
 
         try {
+            // 전체 페이지 수 추출 (전체 모드에서만 사용)
+            const totalPages = scraper.getTotalPages();
+            console.log('📊 Total pages detected:', totalPages);
+
             // 모달이 없으면 새로 생성 (현재 페이지 모드)
             // if (!modal) {
             //     console.log('🟢 [DEBUG] Creating modal...');
@@ -168,19 +210,11 @@ function executeScraping(scraperId: string): any {
             }
 
             console.log('modal');
-            console.log(modal)
-            // 진행상황 표시
-            if (modal) {
-                modal.updateUnifiedProgress({
-                    mode: 'single',
-                    status: 'scraping',
-                    currentPage: 1,
-                    totalPages: 10,
-                    itemsCollected: results.length,
-                    // message: `${results.length}개 수집 완료`
-                    message: `잠시만요! 완료되면 결과를 보여드릴게요`
-                });
-            }
+            console.log(modal);
+
+            // 진행상황 표시는 background script의 UPDATE_PROGRESS에서만 처리
+            // executeScraping은 단순히 현재 페이지 스크래핑만 담당
+            // (전체 페이지 모드에서 results.length는 현재 페이지만의 값이므로 여기서 업데이트하면 안됨)
 
             // 결과 + 다음 페이지 정보 반환
             const nextButton = scraper.findNextButton();
@@ -191,7 +225,8 @@ function executeScraping(scraperId: string): any {
             return {
                 success: true,
                 results: results,
-                hasNextPage: hasNextPage
+                hasNextPage: hasNextPage,
+                totalPages: totalPages  // 전체 페이지 수 포함
             };
 
         } catch (error) {

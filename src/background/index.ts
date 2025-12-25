@@ -186,11 +186,20 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
         console.log('✅ State initialized for new scraping session');
 
-        // 모달 상태 설정 - StateManager 사용
-        await stateManager.showModal(currentPage + 1, null);
+        // 첫 페이지 모달 storage 설정 (전체 페이지는 나중에 업데이트)
+        await chrome.storage.session.set({
+            test_show_modal: {
+                count: 1,
+                currentPage: currentPage + 1,
+                totalPages: null,  // 첫 페이지 스크래핑 후 업데이트
+                previousCount: 0  // 누적 카운트를 위한 이전 갯수
+            }
+        });
 
         // 전체 페이지 모드: 첫 페이지로 이동
         if (mode === 'all') {
+            // Content Script가 자동으로 읽을 수 있도록 storage 설정
+
             console.log('🔄 Navigating to first page...');
             await chrome.tabs.update(tabId, { url: normalizedUrl });
 
@@ -198,21 +207,17 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             await navigator.waitForPageLoad(tabId);
             timer.start();
 
-            // 즉시 모달 표시
-            try {
-                await chrome.tabs.sendMessage(tabId, {
-                    type: 'SHOW_MODAL',
-                    payload: { currentPage: currentPage + 1 }
-                });
-                console.log('✅ Modal shown for all-page mode');
-            } catch (error) {
-                console.error('❌ Failed to show modal:', error);
-            }
+
+            console.log('✅ Modal storage set for page', currentPage + 1);
+
+            // Content Script에게 storage 읽으라고 알림
+            // try {
+            //     await chrome.tabs.sendMessage(tabId, { type: 'CHECK_MODAL_STORAGE' });
+            // } catch (error) {
+            //     console.log('Content script will auto-check on load');
+            // }
         } else {
-            await chrome.tabs.sendMessage(tabId, {
-                type: 'SHOW_MODAL',
-                payload: { currentPage: currentPage + 1 }
-            });
+            await chrome.tabs.sendMessage(tabId, { type: 'CHECK_MODAL_STORAGE' });
             timer.start();
         }
 
@@ -224,6 +229,19 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             const state = await stateManager.getState();
             if (state.shouldStop) {
                 console.log('🛑 Scraping stopped by user (before scraping)');
+
+                // 모달 닫기 및 storage 정리
+                try {
+                    await chrome.storage.session.remove('test_show_modal');
+                    await chrome.tabs.sendMessage(tabId, { type: 'HIDE_MODAL' });
+                    console.log('✅ Modal hidden and storage cleaned on early stop');
+                } catch (error) {
+                    console.warn('⚠️ Failed to cleanup on stop:', error);
+                }
+
+                // StateManager 상태 초기화
+                await stateManager.reset();
+                console.log('✅ State manager reset');
 
                 // Side Panel에 완료 신호 (버튼 복구)
                 chrome.runtime.sendMessage({
@@ -254,6 +272,39 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                         pageResponse = response;
                         console.log(`✅ Page ${currentPage + 1}: ${response.results.length} items collected`);
 
+                        // 첫 페이지에서 totalPages 추출하여 storage 업데이트
+                        if (currentPage === 0 && response.totalPages) {
+                            console.log(`📊 Total pages from first page: ${response.totalPages}`);
+                            await chrome.storage.session.set({
+                                test_show_modal: {
+                                    count: 0,
+                                    currentPage: 1,
+                                    totalPages: response.totalPages,
+                                    previousCount: 0
+                                }
+                            });
+                        }
+
+                        // 진행 상황 업데이트 (모달에 표시)
+                        allResults.push(...response.results);
+
+                        // Storage에서 totalPages 가져오기 (전체 페이지 모드만!)
+                        const storageData = await chrome.storage.session.get('test_show_modal');
+                        const totalPages = mode === 'all' ? (storageData.test_show_modal?.totalPages || null) : null;
+
+                        try {
+                            await chrome.tabs.sendMessage(tabId, {
+                                type: 'UPDATE_PROGRESS',
+                                payload: {
+                                    currentPage: currentPage + 1,
+                                    itemsCollected: allResults.length,
+                                    totalPages: totalPages  // 전체 페이지 수 포함
+                                }
+                            });
+                        } catch (error) {
+                            console.log('Failed to update progress');
+                        }
+
                         break;
                     } else {
                         console.warn(`⚠️ Page ${currentPage + 1}: Empty or invalid response, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
@@ -272,6 +323,20 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             const state2 = await stateManager.getState();
             if (state2.shouldStop) {
                 console.log('🛑 Scraping stopped by user');
+
+                // 모달 닫기 및 storage 정리
+                try {
+                    await chrome.storage.session.remove('test_show_modal');
+                    await chrome.tabs.sendMessage(tabId, { type: 'HIDE_MODAL' });
+                    console.log('✅ Modal hidden and storage cleaned on stop');
+                } catch (error) {
+                    console.warn('⚠️ Failed to cleanup on stop:', error);
+                }
+
+                // StateManager 상태 초기화
+                await stateManager.reset();
+                console.log('✅ State manager reset');
+
                 // Side Panel에 완료 신호 (버튼 복구)
                 chrome.runtime.sendMessage({
                     type: 'SCRAPE_COMPLETE'
@@ -279,10 +344,8 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                 return;
             }
 
-            // 결과 추가
-            if (pageResponse && pageResponse.results && pageResponse.results.length > 0) {
-                allResults.push(...pageResponse.results);
-            } else {
+            // 결과는 이미 위에서 추가됨 (중복 방지)
+            if (!pageResponse || !pageResponse.results || pageResponse.results.length === 0) {
                 console.warn(`⚠️ Page ${currentPage + 1}: Skipped after ${MAX_RETRIES} retries`);
             }
 
@@ -298,7 +361,20 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
             // 중단 확인 - StateManager 사용
             const state3 = await stateManager.getState();
             if (state3.shouldStop) {
-                console.log('🛑 Scraping stopped by user (before scraping)');
+                console.log('🛑 Scraping stopped by user (before next page)');
+
+                // 모달 닫기 및 storage 정리
+                try {
+                    await chrome.storage.session.remove('test_show_modal');
+                    await chrome.tabs.sendMessage(tabId, { type: 'HIDE_MODAL' });
+                    console.log('✅ Modal hidden and storage cleaned on stop');
+                } catch (error) {
+                    console.warn('⚠️ Failed to cleanup on stop:', error);
+                }
+
+                // StateManager 상태 초기화
+                await stateManager.reset();
+                console.log('✅ State manager reset');
 
                 // Side Panel에 완료 신호 (버튼 복구)
                 chrome.runtime.sendMessage({
@@ -319,34 +395,61 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
 
             console.log(`🔄 Navigating to page ${currentPage + 1}: ${nextPageUrl}`);
 
-            // 모달 상태 설정 - StateManager 사용
-            await stateManager.showModal(currentPage + 1, null);
+            // 페이지 전환 전 모달 storage 설정 (누적 카운트 포함)
+            // totalPages 유지 (첫 페이지에서 추출한 값)
+            const currentStorage = await chrome.storage.session.get('test_show_modal');
+            const totalPages = currentStorage.test_show_modal?.totalPages || null;
 
-
+            await chrome.storage.session.set({
+                test_show_modal: {
+                    count: 1,
+                    currentPage: currentPage + 1,
+                    totalPages: totalPages,  // 첫 페이지에서 추출한 값 유지
+                    previousCount: allResults.length  // 이전 페이지까지의 누적 갯수
+                }
+            });
 
             await chrome.tabs.update(tabId, { url: nextPageUrl });
             // 페이지 로드 완료 대기 (필수!)
             await navigator.waitForPageLoad(tabId);
             timer.restart();
 
-            // // 즉시 모달 표시
-            // try {
-            //     await chrome.tabs.sendMessage(tabId, {
-            //         type: 'SHOW_MODAL',
-            //         payload: { currentPage: currentPage + 1 }
-            //     });
-            // } catch (error) {
-            //     console.error('❌ Failed to show modal on next page:', error);
-            // }
+            // Content Script가 페이지 로드 시 자동으로 모달 표시
+            console.log('✅ Next page loaded, content script will show modal automatically');
+
+            // 추가 안전장치: 명시적으로 체크 요청
+            try {
+                await chrome.tabs.sendMessage(tabId, { type: 'CHECK_MODAL_STORAGE' });
+            } catch (error) {
+                console.log('Content script will auto-check on load');
+            }
         }
 
-        // 스크래핑 완료 - 모달 닫기
+        // 스크래핑 완료 - 모달 닫기 및 정리
         try {
+            // 모달 storage 정리 (다음 페이지에서 모달이 안 뜨도록)
+            await chrome.storage.session.set({
+                test_show_modal: { count: 0 }
+            });
+
             await chrome.tabs.sendMessage(tabId, { type: 'HIDE_MODAL' });
             console.log('✅ Modal hidden after scraping complete');
         } catch (error) {
             console.warn('⚠️ Failed to hide modal:', error);
         }
+
+        // StateManager 상태 초기화
+        await stateManager.reset();
+        console.log('✅ State manager reset after completion');
+
+        // 추가 안전장치: 짧은 대기 후 다시 한 번 body overflow 복원 확인
+        // setTimeout(async () => {
+        //     try {
+        //         await chrome.tabs.sendMessage(tabId, { type: 'ENSURE_SCROLL_ENABLED' });
+        //     } catch (error) {
+        //         // 무시
+        //     }
+        // }, 500);
 
         // 모든 결과 저장 및 페이지 열기
         // 현재 탭 정보 가져오기 (pageTitle, favicon)

@@ -175,6 +175,17 @@ body {
     color: #333;
 }
 
+/* 상품명 링크 스타일 - 언더라인 및 파란색 제거 */
+.product-link {
+    color: #333;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.product-link:hover {
+    color: #667eea;
+}
+
 .td-price {
     font-weight: 600;
     color: #e74c3c;
@@ -188,6 +199,12 @@ body {
 }
 
 .td-seller {
+    font-size: 13px;
+    color: #666;
+}
+
+.td-seller-id,
+.td-seller-grade {
     font-size: 13px;
     color: #666;
 }

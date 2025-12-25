@@ -569,6 +569,19 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+/* 현재 보고 있는 결과 강조 */
+.history-item.current-result {
+    background: rgba(124, 58, 237, 0.1);
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+}
+
+.history-item.current-result:hover {
+    background: rgba(124, 58, 237, 0.15);
+    border-color: #7c3aed;
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.3);
+}
+
 .history-item-header {
     display: flex;
     align-items: center;

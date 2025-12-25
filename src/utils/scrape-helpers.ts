@@ -24,14 +24,16 @@ export async function saveScrapeResult(params: {
     items: any[];
 }): Promise<string> {
 
+    const timestamp = Date.now();  // 한 번만 생성!
+
     const result: ScrapeResult = {
-        id: Date.now().toString(),
+        id: timestamp.toString(),  // timestamp를 재사용
         scraperId: params.scraperId,
         scraperName: getScraperDisplayName(params.scraperId),
         url: params.url,
         pageTitle: params.pageTitle || document.title,
         favicon: params.favicon || document.querySelector<HTMLLinkElement>('link[rel*="icon"]')?.href || '',
-        timestamp: Date.now(),
+        timestamp: timestamp,  // 같은 timestamp 사용
         totalItems: params.items.length,
         items: params.items
     };
