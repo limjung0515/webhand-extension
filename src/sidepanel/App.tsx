@@ -244,6 +244,7 @@ function App() {
             await sendToBackground({
                 type: 'START_SCRAPE',
                 payload: {
+                    tabId: tab.id,
                     scraperId: selectedScraperId,
                     mode: scrapeMode,  // 'current' or 'all'
                     baseUrl: tab.url
