@@ -65,6 +65,6 @@ export class ResultManager {
      */
     async openResultPage(resultId: string): Promise<void> {
         const resultUrl = chrome.runtime.getURL(`src/pages/results.html?id=${resultId}`);
-        const tab = await chrome.tabs.create({ url: resultUrl });
+        await chrome.tabs.create({ url: resultUrl });
     }
 }
