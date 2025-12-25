@@ -229,7 +229,6 @@ async function handleAllPageScrape(payload: { tabId: number; scraperId: string; 
                             scraperId: scraperId
                         }
                     });
-                    log('✅ Page', currentPage, 'completed');
 
                     if (success && response && response.results && response.results.length > 0) {
                         pageResponse = response;

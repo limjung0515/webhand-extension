@@ -23,13 +23,11 @@ async function checkAndShowModalFromCount() {
     try {
         const result = await chrome.storage.session.get('test_show_modal');
         if (result.test_show_modal && result.test_show_modal.count > 0) {
-            log('🎬 [COUNT] Auto-showing modal (count:', result.test_show_modal.count, ')');
 
             // count 감소 먼저! (중복 실행 방지)
             await chrome.storage.session.set({
                 test_show_modal: { ...result.test_show_modal, count: 0 }
             });
-            log('✅ Modal count decremented to 0');
 
             // 그 다음 모달 표시
             const modal = new ScrapeModal();
@@ -37,7 +35,6 @@ async function checkAndShowModalFromCount() {
 
             // 누적 카운트를 위해 previousCount로 초기화
             const previousCount = result.test_show_modal.previousCount || 0;
-            log('🔢 Initializing currentCount from previousCount:', previousCount);
             (modal as any).currentCount = previousCount;
 
             modal.show();
@@ -81,7 +78,6 @@ chrome.runtime.onMessage.addListener((
 
         case 'SHOW_MODAL':
             // 동기 방식: 즉시 모달 생성 (count 체크 없이)
-            log('🎬 [SHOW_MODAL] Creating modal synchronously');
 
             const modal = new ScrapeModal();
             activeModal = modal;
@@ -92,7 +88,6 @@ chrome.runtime.onMessage.addListener((
 
         case 'CHECK_MODAL_STORAGE':
             // Storage를 확인하고 모달 표시
-            log('🔍 [CHECK_MODAL_STORAGE] Checking storage...');
             checkAndShowModalFromCount();
             sendResponse({ success: true });
             return false;
