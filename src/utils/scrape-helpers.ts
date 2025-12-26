@@ -55,6 +55,7 @@ export interface UnifiedProgress {
     currentPage: number;
     totalPages: number | null;
     itemsCollected: number;
+    total?: number;  // 전체 아이템 수 (네이버 부동산용)
     message?: string;
 }
 

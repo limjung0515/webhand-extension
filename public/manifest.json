@@ -46,5 +46,15 @@
     "host_permissions": [
         "<all_urls>"
     ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "bypass-devtools.js"
+            ],
+            "matches": [
+                "https://m.land.naver.com/*"
+            ]
+        }
+    ],
     "minimum_chrome_version": "114"
 }

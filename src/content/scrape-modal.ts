@@ -264,17 +264,29 @@ export class ScrapeModal {
         const statusMessage = this.modal.querySelector('#webhand-status-message') as HTMLDivElement;
         const subtitle = this.modal.querySelector('#webhand-modal-subtitle') as HTMLElement;
 
-        // ✅ 첫 업데이트 시 프로그레스바와 스크롤 시작
-        if (this.progressBar && this.progressBar.style.width === '0%') {
-            // 프로그레스바를 2초에 걸쳐 100%로 채우기
-            setTimeout(() => {
-                if (this.progressBar) {
-                    this.progressBar.style.width = '100%';
-                }
-            }, 50);
+        // ✅ 프로그레스바 업데이트
+        if (this.progressBar) {
+            // total이 있으면 정확한 퍼센트 계산 (네이버 부동산)
+            if (progress.total && progress.total > 0) {
+                const percentage = Math.min(100, (progress.itemsCollected / progress.total) * 100);
+                this.progressBar.style.width = `${percentage}%`;
 
-            // 페이지 최하단으로 스크롤
-            this.scrollToBottom();
+                // 첫 업데이트 시 스크롤 시작
+                if (percentage > 0 && !this.scrollAnimationId) {
+                    this.scrollToBottom();
+                }
+            }
+            // 없으면 기존 로직 (도매매: 첫 업데이트에 100%)
+            else if (this.progressBar.style.width === '0%') {
+                setTimeout(() => {
+                    if (this.progressBar) {
+                        this.progressBar.style.width = '100%';
+                    }
+                }, 50);
+
+                // 페이지 최하단으로 스크롤
+                this.scrollToBottom();
+            }
         }
 
         // 통계 표시
@@ -284,13 +296,15 @@ export class ScrapeModal {
 
         // 페이지 진행률
         if (pageProgress) {
-
             if (progress.mode === 'multi' && progress.totalPages) {
                 // 전체 페이지: "1 / 7 페이지"
                 const displayText = `${progress.currentPage} / ${progress.totalPages} 페이지`;
                 pageProgress.textContent = displayText;
+            } else if (progress.total) {
+                // 네이버 부동산: "현재 페이지"
+                pageProgress.textContent = '현재 페이지';
             } else {
-                // 현재 페이지: URL에서 실제 페이지 번호 추출
+                // 도매매 단일 페이지: URL에서 실제 페이지 번호 추출
                 const currentPageFromUrl = this.getCurrentPageFromUrl();
                 const displayText = `${currentPageFromUrl} 페이지`;
                 pageProgress.textContent = displayText;
@@ -298,11 +312,12 @@ export class ScrapeModal {
         }
 
         // 수집 아이템 (애니메이션 적용)
-        // UX 개선: 실제보다 1-2개 적게 표시해서 화면 전환이 자연스럽게 느껴지도록
-        const displayCount = Math.max(0, progress.itemsCollected - Math.floor(Math.random() * 2));
+        // 네이버 부동산: 정확한 개수 표시 (패딩 없음)
+        // 도매매: UX 개선을 위해 1-2개 적게 표시
+        const displayCount = progress.total
+            ? progress.itemsCollected  // 네이버 부동산: 패딩 없음
+            : Math.max(0, progress.itemsCollected - Math.floor(Math.random() * 2));  // 도매매: 패딩 적용
         this.animateCount(displayCount, 1500);
-
-        // (프로그레스 바는 첫 업데이트 시 위에서 100%로 채워짐)
 
         // 상태 메시지
         if (statusMessage && progress.message) {

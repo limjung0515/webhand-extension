@@ -5,6 +5,7 @@ export enum MessageType {
     STOP_SCRAPE = 'STOP_SCRAPE',
     SCRAPE_COMPLETE = 'SCRAPE_COMPLETE',
     SCRAPE_ERROR = 'SCRAPE_ERROR',
+    NAVER_LAND_PROGRESS = 'NAVER_LAND_PROGRESS',  // Content → Background (진행률)
 
     // Site-specific scraping
     START_SITE_SCRAPE = 'START_SITE_SCRAPE',

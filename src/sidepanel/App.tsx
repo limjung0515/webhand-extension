@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SUPPORTED_SITES, findAllScrapersForUrl, getSiteByUrl } from '@/scrapers/registry';
 import type { ScrapeResult } from '@/types/scraper';
+// import type { ShareSettings } from '@/types/settings';  // 결과 페이지에서만 사용
 import { sendToTab, sendToBackground } from '../utils/messaging';
 
 type ScrapeMode = 'current' | 'all';
@@ -22,10 +23,42 @@ function App() {
     const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
     const [contentScriptReady, setContentScriptReady] = useState(false);
     const [currentResultId, setCurrentResultId] = useState<string | null>(null);  // 현재 보고 있는 결과 ID
+    const [naverLandCount, setNaverLandCount] = useState<number | null>(null);  // 네이버 부동산 매물 개수
 
     // 현재 URL에 맞는 스크래퍼들
     const availableScrapers = findAllScrapersForUrl(currentUrl);
     const isActive = availableScrapers.length > 0;
+
+    // 네이버 부동산 매물 개수 확인
+    const checkNaverLandCount = async () => {
+        if (selectedScraperId !== 'naver-land-map') {
+            setNaverLandCount(null);
+            return;
+        }
+
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab.id) return;
+
+            const { success, data } = await sendToTab(tab.id, { type: 'GET_NAVER_LAND_COUNT' });
+            if (success && data) {
+                setNaverLandCount(data.count);
+            }
+        } catch (error) {
+            setNaverLandCount(null);
+        }
+    };
+
+    // 네이버 부동산일 때 매물 개수 주기적 확인
+    useEffect(() => {
+        if (selectedScraperId === 'naver-land-map' && contentScriptReady) {
+            checkNaverLandCount();
+            const interval = setInterval(checkNaverLandCount, 2000); // 2초마다 확인
+            return () => clearInterval(interval);
+        } else {
+            setNaverLandCount(null);
+        }
+    }, [selectedScraperId, contentScriptReady, currentUrl]);
 
     // 자동으로 첫 번째 스크래퍼 선택
     useEffect(() => {
@@ -35,6 +68,13 @@ function App() {
             setSelectedScraperId(null);
         }
     }, [currentUrl, availableScrapers]);
+
+    // 네이버 부동산 선택 시 자동으로 "현재 페이지만" 모드로 전환
+    useEffect(() => {
+        if (selectedScraperId === 'naver-land-map') {
+            setScrapeMode('current');
+        }
+    }, [selectedScraperId]);
 
     // 스크래핑 완료 메시지 리스너
     useEffect(() => {
@@ -51,6 +91,15 @@ function App() {
             chrome.runtime.onMessage.removeListener(handleMessage);
         };
     }, []);
+
+    // 공유 설정 로드 (결과 페이지에서 처리)
+    // useEffect(() => {
+    //     chrome.storage.local.get('shareSettings', (result) => {
+    //         if (result.shareSettings) {
+    //             setShareSettings(result.shareSettings);
+    //         }
+    //     });
+    // }, []);
 
     // 현재 탭 정보 업데이트 함수
     const updateCurrentTab = () => {
@@ -191,11 +240,11 @@ function App() {
         }
     };
 
-    // 히스토리 열기
-    const handleHistoryClick = () => {
-        loadHistory();
-        setShowHistory(true);
-    };
+    // 히스토리 열기 (현재 미사용 - 탭 방식으로 변경됨)
+    // const handleHistoryClick = () => {
+    //     setShowHistory(true);
+    //     loadHistory();
+    // };
 
     // 히스토리 닫기
     const handleCloseHistory = () => {
@@ -204,26 +253,28 @@ function App() {
 
     // 히스토리 아이템 클릭 - 결과 페이지 열기
     const handleHistoryItemClick = (item: HistoryItem) => {
+        console.log('📋 히스토리 아이템 클릭:', item);
+        console.log('📋 item.id:', item.id);
         sendToBackground({
             type: 'OPEN_RESULT_PAGE',
-            payload: { id: item.id }
+            payload: { resultId: item.id }
         });
         setShowHistory(false);
     };
 
     // 히스토리 삭제
-    const handleDeleteHistory = async (item: HistoryItem, e: React.MouseEvent) => {
-        e.stopPropagation();
-
+    const handleDeleteHistory = async (id: string) => {
         if (confirm('이 히스토리를 삭제하시겠습니까?')) {
-            try {
-                await chrome.storage.local.remove(`scrape_result_${item.id}`);
-                loadHistory(); // 다시 로드
-            } catch (err) {
-                console.error('Failed to delete history:', err);
-            }
+            await chrome.storage.local.remove(`scrape_result_${id}`);
+            loadHistory();
         }
     };
+
+    // 설정 저장 (현재 미사용 - 결과 페이지에서 처리)
+    // const handleSaveSettings = async () => {
+    //     await chrome.storage.local.set({ shareSettings });
+    //     alert('✅ 설정이 저장되었습니다');
+    // };
 
     const handleStartScrape = async () => {
         if (!isActive || !selectedScraperId) {
@@ -319,7 +370,7 @@ function App() {
         <div className="app">
             <header className="header">
                 <h1>WebHand</h1>
-                <button className="history-btn" onClick={handleHistoryClick} title="스크래핑 히스토리">
+                <button className="history-btn" onClick={() => setShowHistory(true)} title="스크래핑 히스토리">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="12" cy="12" r="10" />
                         <polyline points="12 6 12 12 16 14" />
@@ -411,17 +462,19 @@ function App() {
                                     onChange={() => setScrapeMode('current')}
                                     disabled={!isActive}
                                 />
-                                <span>현재 페이지만</span>
+                                <span>현재 페이지</span>
                             </label>
-                            <label className={`radio-label ${!isActive ? 'disabled' : ''}`}>
-                                <input
-                                    type="radio"
-                                    checked={scrapeMode === 'all'}
-                                    onChange={() => setScrapeMode('all')}
-                                    disabled={!isActive}
-                                />
-                                <span>전체 페이지 (마지막까지)</span>
-                            </label>
+                            {selectedScraperId !== 'naver-land-map' && (
+                                <label className={`radio-label ${!isActive ? 'disabled' : ''}`}>
+                                    <input
+                                        type="radio"
+                                        checked={scrapeMode === 'all'}
+                                        onChange={() => setScrapeMode('all')}
+                                        disabled={!isActive}
+                                    />
+                                    <span>전체 페이지</span>
+                                </label>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -430,10 +483,35 @@ function App() {
                     <button
                         className={`${isLoading ? "btn-stop" : "btn-scrape"} ${isStopping ? "disabled" : ""}`}
                         onClick={isLoading ? handleStopScrape : handleStartScrape}
-                        disabled={!isActive || (!isLoading && !contentScriptReady) || isStopping}
+                        disabled={
+                            !isActive ||
+                            (!isLoading && !contentScriptReady) ||
+                            isStopping ||
+                            (selectedScraperId === 'naver-land-map' && !isLoading && (naverLandCount === null || naverLandCount === 0 || naverLandCount >= 3000))
+                        }
                     >
                         {isStopping ? '중단 중...' : (isLoading ? '스크래핑 중단' : '스크래핑 시작')}
                     </button>
+
+                    {/* 네이버 부동산 경고 메시지 (3000개 이상이거나 0개일 때만) */}
+                    {selectedScraperId === 'naver-land-map' && naverLandCount !== null && (naverLandCount === 0 || naverLandCount >= 3000) && (
+                        <div style={{
+                            marginTop: '12px',
+                            padding: '10px',
+                            borderRadius: '4px',
+                            fontSize: '13px',
+                            backgroundColor: '#fff3cd',
+                            color: '#856404',
+                            border: '1px solid #ffeaa7',
+                            textAlign: 'center'
+                        }}>
+                            {naverLandCount === 0 ? (
+                                <>⚠️ 매물이 없거나 너무 많습니다<br />지도 범위를 조정해주세요</>
+                            ) : (
+                                <>⚠️ 매물이 {naverLandCount}개 이상입니다<br />3000개 미만으로 조정해주세요</>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -479,7 +557,10 @@ function App() {
                                             </div>
                                             <button
                                                 className="delete-btn"
-                                                onClick={(e) => handleDeleteHistory(item, e)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteHistory(item.id);
+                                                }}
                                                 title="삭제"
                                             >
                                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

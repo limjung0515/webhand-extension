@@ -37,8 +37,16 @@ export const SCRAPERS: ScraperConfig[] = [
         url: 'https://domemedb.domeggook.com',
         matcher: (url: string) => url.includes('domemedb.domeggook.com'),
         scraperClass: 'DomemeScraper'
+    },
+    {
+        id: 'naver-land-map',
+        name: '네이버 부동산 매물',
+        icon: '🏠',
+        domain: 'm.land.naver.com',
+        url: 'https://m.land.naver.com',
+        matcher: (url: string) => url.includes('m.land.naver.com/map'),
+        scraperClass: 'NaverLandScraper'
     }
-    // 네이버 부동산과 카카오맵 스크래퍼는 추후 추가
 ];
 
 /**

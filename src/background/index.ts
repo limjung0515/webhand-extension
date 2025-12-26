@@ -54,6 +54,11 @@ chrome.runtime.onMessage.addListener((
             handleStopScrape(message.payload);
             break;
 
+        case MessageType.NAVER_LAND_PROGRESS:
+            // Content Script로부터 네이버 부동산 진행률 받음
+            handleNaverLandProgress(message.payload);
+            break;
+
         default:
             // Handle custom message types
             if ((message.type as any) === 'OPEN_RESULT_PAGE') {
@@ -81,7 +86,13 @@ async function handleOpenSidePanel(tabId?: number) {
 async function handleStartScrape(payload: { tabId: number; scraperId: string; mode: 'current' | 'all'; baseUrl: string }) {
     const { tabId, scraperId, mode, baseUrl } = payload;
 
-    // 모든 로직은 handleAllPageScrape에서 처리
+    // 네이버 부동산은 별도 처리 (단일 페이지 무한스크롤)
+    if (scraperId === 'naver-land-map') {
+        await handleNaverLandScrape({ tabId, scraperId, baseUrl });
+        return;
+    }
+
+    // 도매매 등 다른 스크래퍼는 기존 로직 사용
     await handleAllPageScrape({ tabId, scraperId, baseUrl, mode });
 }
 
@@ -123,6 +134,8 @@ chrome.action.onClicked.addListener((tab) => {
 async function handleOpenResultPage(payload: { resultId: string }) {
     const resultUrl = chrome.runtime.getURL(`src/pages/results.html?id=${payload.resultId}`);
 
+    console.log('📄 결과 페이지 열기:', payload.resultId);
+
     try {
         await chrome.tabs.create({ url: resultUrl });
     } catch (error) {
@@ -130,8 +143,90 @@ async function handleOpenResultPage(payload: { resultId: string }) {
     }
 }
 
-// 상태 관리 서비스 (점진적 마이그레이션용)
 const stateManager = ScrapingStateManager.getInstance();
+
+// Handle Naver Land Progress updates
+async function handleNaverLandProgress(payload: { current: number; total: number; status: string; message: string }) {
+    try {
+        const state = await stateManager.getState();
+        if (!state.tabId) return;
+
+        // Content Script로 UPDATE_PROGRESS 메시지 전송 (네이버 부동산: total 포함)
+        await sendToTab(state.tabId, {
+            type: 'UPDATE_PROGRESS',
+            payload: {
+                currentPage: 1, // 네이버 부동산은 단일 페이지
+                totalPages: null,
+                count: payload.current,
+                total: payload.total  // 전체 아이템 수 전달
+            }
+        });
+    } catch (error) {
+        console.warn('⚠️ Failed to update progress:', error);
+    }
+}
+
+// Handle Naver Land Scraping (단일 페이지 무한스크롤)
+async function handleNaverLandScrape(payload: { tabId: number; scraperId: string; baseUrl: string }) {
+    const { tabId, scraperId, baseUrl } = payload;
+
+    try {
+        // 상태 초기화
+        await stateManager.startScraping(tabId, scraperId);
+        await sendToTab(tabId, { type: 'RESET_STATE' });
+        const orchestrator = new ScrapingOrchestrator(3000);
+        orchestrator.startTimer();
+
+        // 모달 표시
+        await sendToTab(tabId, { type: 'SHOW_MODAL' });
+        await orchestrator.waitTimer();
+
+        orchestrator.restartTimer();
+        // 스크래핑 시작 (Content Script에서 실행)
+        const { success, data: response } = await sendToTab(tabId, {
+            type: 'SCRAPE_PAGE',
+            payload: { scraperId }
+        });
+
+        if (!success || !response) {
+            throw new Error('스크래핑 실패');
+        }
+
+        await orchestrator.waitTimer();
+        // 모달 닫기
+        await sendToTab(tabId, { type: 'HIDE_MODAL' });
+
+        // StateManager 초기화
+        await stateManager.reset();
+
+        // 결과 저장 및 페이지 열기
+        let pageTitle = '';
+        let favicon = '';
+        try {
+            const tab = await chrome.tabs.get(tabId);
+            pageTitle = tab.title || '';
+            favicon = tab.favIconUrl || '';
+        } catch (error) {
+            console.warn('⚠️ Failed to get tab info:', error);
+        }
+
+        await saveAndOpenResults({
+            scraperId,
+            results: response.results,
+            url: baseUrl,
+            pageTitle,
+            favicon
+        });
+
+    } catch (error) {
+        console.error('❌ Naver Land scrape failed:', error);
+
+        // 에러 시 정리
+        await sendToTab(tabId, { type: 'HIDE_MODAL' });
+        await stateManager.reset();
+        notifySidePanel({ type: 'SCRAPE_COMPLETE' });
+    }
+}
 
 // Handle all-page scraping (Background controls page navigation)
 async function handleAllPageScrape(payload: { tabId: number; scraperId: string; baseUrl: string; mode: 'current' | 'all' }) {
