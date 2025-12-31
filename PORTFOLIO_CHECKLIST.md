@@ -150,17 +150,15 @@ git push origin main
 README.md의 다음 부분을 본인 정보로 교체하세요:
 
 ```markdown
+# ✅ 완료됨!
 # Line 235
-git clone https://github.com/yourusername/webhand-extension.git
-# → 본인의 GitHub 사용자명으로 교체
+git clone https://github.com/limjung0515/webhand-extension.git
 
 # Line 447
-- GitHub Issues: [Create an issue](https://github.com/yourusername/webhand-extension/issues)
-# → 본인의 GitHub 사용자명으로 교체
+- GitHub Issues: [Create an issue](https://github.com/limjung0515/webhand-extension/issues)
 
 # Line 448
-- Email: your-email@example.com (optional)
-# → 본인의 이메일 주소로 교체 (선택)
+- Email: limjung0515@gmail.com
 ```
 
 ---
