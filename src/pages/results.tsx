@@ -8,14 +8,24 @@ function ResultsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [dataType, setDataType] = useState<'product' | 'naverland'>('product');
+    const [googleSheetsUrl, setGoogleSheetsUrl] = useState<string>('');
+    const [emailAddress, setEmailAddress] = useState<string>('');
 
-    // 하드코딩된 설정
-    const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbw1xtMtnFkT2zCR1r6YuOWcQcjdplW2zt0NeZUNCora_te7j3VnppVrkCqU8Xprj1M/exec';
-    const EMAIL_ADDRESS = 'prohoon91@gmail.com';
-
+    // Load settings from Chrome storage
     useEffect(() => {
+        loadSettings();
         loadResult();
     }, []);
+
+    async function loadSettings() {
+        try {
+            const settings = await chrome.storage.sync.get(['googleSheetsUrl', 'emailAddress']);
+            setGoogleSheetsUrl(settings.googleSheetsUrl || '');
+            setEmailAddress(settings.emailAddress || '');
+        } catch (err) {
+            console.warn('Failed to load settings:', err);
+        }
+    }
 
     async function loadResult() {
         try {
@@ -108,17 +118,17 @@ function ResultsPage() {
 
     // Google Sheets로 전송
     async function sendToGoogleSheets() {
-        if (!GOOGLE_SHEETS_URL) {
-            alert('⚠️ Google Sheets URL이 설정되지 않았습니다');
+        if (!googleSheetsUrl) {
+            alert('⚠️ Google Sheets URL이 설정되지 않았습니다.\n확장 프로그램 설정에서 URL을 입력해주세요.');
             return;
         }
 
         console.log('📊 Google Sheets 전송 시작...');
-        console.log('URL:', GOOGLE_SHEETS_URL);
+        console.log('URL:', googleSheetsUrl);
         console.log('데이터:', result);
 
         try {
-            const response = await fetch(GOOGLE_SHEETS_URL, {
+            const response = await fetch(googleSheetsUrl, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: {
@@ -137,15 +147,21 @@ function ResultsPage() {
 
     // 이메일로 보내기
     async function sendEmail() {
+        if (!googleSheetsUrl || !emailAddress) {
+            alert('⚠️ 이메일 설정이 완료되지 않았습니다.\n확장 프로그램 설정에서 Google Sheets URL과 이메일 주소를 입력해주세요.');
+            return;
+        }
+
         console.log('📧 이메일 전송 시작...');
 
         try {
             const emailData = {
                 ...result,
-                action: 'email'
+                action: 'email',
+                recipientEmail: emailAddress
             };
 
-            await fetch(GOOGLE_SHEETS_URL, {
+            await fetch(googleSheetsUrl, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: {
@@ -155,7 +171,7 @@ function ResultsPage() {
             });
 
             console.log('✅ 이메일 전송 완료');
-            alert(`✅ ${EMAIL_ADDRESS}로 이메일 전송 완료!`);
+            alert(`✅ ${emailAddress}로 이메일 전송 완료!`);
         } catch (err) {
             console.error('❌ 이메일 전송 에러:', err);
             alert('❌ 전송 실패: ' + (err instanceof Error ? err.message : '알 수 없는 오류'));
